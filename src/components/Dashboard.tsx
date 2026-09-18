@@ -229,8 +229,8 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
                       </span>
                     )}
                     {trigEstimate.trend === "stable" && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#0f380f] uppercase whitespace-nowrap">
-                        Estable
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#0f380f] uppercase whitespace-nowrap opacity-85" title="Sin variación respecto a la analítica">
+                        ±0 mg/dL
                       </span>
                     )}
                   </div>
@@ -238,7 +238,7 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
                     Estimado Hoy
                   </p>
                   {trigEstimate.estimatedRisk && (
-                    <span className="inline-block mt-1 text-[10px] font-bold px-1 py-0.5 rounded border border-[#0f380f]">
+                    <span className="inline-block mt-1 text-[10px] font-bold px-1 py-0.5 rounded bg-[#0f380f] text-[#9bbc0f]">
                       {trigEstimate.estimatedRisk.label}
                     </span>
                   )}
@@ -271,7 +271,7 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
                   )}
                   {trigEstimate.trend === "stable" && (
                     <span className="text-[#0f380f] opacity-90">
-                      • Base {trigEstimate.base} mg/dL (Elevado). Cada comida saludable o bajada de peso reducirá tu estimado.
+                      • Base médica: {trigEstimate.base} mg/dL (ELEVADO). Aún sin variación registrada desde la analítica.
                     </span>
                   )}
                 </p>
