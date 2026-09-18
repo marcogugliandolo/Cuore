@@ -117,7 +117,12 @@ async function callGeminiWithRetry(
   taskName = "gemini-call"
 ): Promise<string> {
   const client = getGeminiClient();
-  const models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+  const models = [
+    "gemini-3.6-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash",
+  ];
   let lastError: any = null;
 
   for (const model of models) {
@@ -135,19 +140,30 @@ async function callGeminiWithRetry(
       } catch (err: any) {
         lastError = err;
         const causeMsg = err?.cause?.message || err?.cause || "";
+        const status = err?.status || err?.code || (err?.error && err?.error?.code);
+        const errMsg = `${err?.message || err} ${causeMsg}`.toLowerCase();
+
         console.warn(
           `[${taskName}] Attempt ${attempt + 1} with model '${model}' failed:`,
           err?.message || err,
           causeMsg ? `(cause: ${causeMsg})` : ""
         );
 
-        const status = err?.status || err?.code || (err?.error && err?.error?.code);
-        const errMsg = `${err?.message || err} ${causeMsg}`.toLowerCase();
-        const isTemporaryError =
-          status === 503 ||
+        // When quota is exhausted (429 / RESOURCE_EXHAUSTED / Quota exceeded),
+        // immediately advance to the next model in the pool instead of re-trying the same exhausted model.
+        const isQuotaExhausted =
           status === 429 ||
-          errMsg.includes("503") ||
           errMsg.includes("429") ||
+          errMsg.includes("quota") ||
+          errMsg.includes("resource_exhausted");
+
+        if (isQuotaExhausted) {
+          break;
+        }
+
+        const isTemporaryNetworkError =
+          status === 503 ||
+          errMsg.includes("503") ||
           errMsg.includes("fetch failed") ||
           errMsg.includes("network") ||
           errMsg.includes("timeout") ||
@@ -156,12 +172,11 @@ async function callGeminiWithRetry(
           errMsg.includes("etimedout") ||
           errMsg.includes("und_err") ||
           errMsg.includes("high demand") ||
-          errMsg.includes("unavailable") ||
-          errMsg.includes("resource_exhausted");
+          errMsg.includes("unavailable");
 
-        if (isTemporaryError && attempt === 0) {
-          // Wait with backoff before retrying this model
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+        if (isTemporaryNetworkError && attempt === 0) {
+          // Wait with brief backoff before retrying this model
+          await new Promise((resolve) => setTimeout(resolve, 800));
         } else {
           // Move to next fallback model
           break;
