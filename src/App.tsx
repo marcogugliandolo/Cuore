@@ -40,19 +40,34 @@ export default function App() {
         const res = await fetch("/api/data");
         if (res.ok) {
           const serverData = await res.json();
-          if (serverData && (serverData.entries || serverData.analyticsData || serverData.weightData)) {
-            // Si el servidor tiene datos, priorizamos los del servidor o los combinamos con lo local
-            if (serverData.entries && serverData.entries.length > 0) {
-              setEntries(serverData.entries);
-            }
-            if (serverData.analyticsData && serverData.analyticsData.length > 0) {
-              setAnalyticsData(serverData.analyticsData);
-            }
-            if (serverData.weightData && serverData.weightData.length > 0) {
-              setWeightData(serverData.weightData);
-            }
-            if (serverData.user) {
-              setCurrentUser(serverData.user);
+          const hasServerData = 
+            (serverData.entries && serverData.entries.length > 0) ||
+            (serverData.analyticsData && serverData.analyticsData.length > 0) ||
+            (serverData.weightData && serverData.weightData.length > 0);
+
+          if (hasServerData) {
+            if (serverData.entries) setEntries(serverData.entries);
+            if (serverData.analyticsData) setAnalyticsData(serverData.analyticsData);
+            if (serverData.weightData) setWeightData(serverData.weightData);
+            if (serverData.user) setCurrentUser(serverData.user);
+          } else {
+            // El servidor está vacío (recién montado el volumen): subimos lo que haya en localStorage
+            const localEntries = JSON.parse(localStorage.getItem("modo_sano_entries") || "[]");
+            const localAnalytics = JSON.parse(localStorage.getItem("cuore_analytics") || "[]");
+            const localWeight = JSON.parse(localStorage.getItem("cuore_weight") || "[]");
+            const localUser = localStorage.getItem("cuore_user") || "Marco";
+
+            if (localEntries.length > 0 || localAnalytics.length > 0 || localWeight.length > 0) {
+              await fetch("/api/data", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  entries: localEntries,
+                  analyticsData: localAnalytics,
+                  weightData: localWeight,
+                  user: localUser,
+                }),
+              });
             }
           }
         }

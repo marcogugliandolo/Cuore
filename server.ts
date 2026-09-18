@@ -7,16 +7,37 @@ import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
 
 // Storage directory path - supports Docker volume mounted at /app/data or local fallback ./data
-const DATA_DIR = process.env.DATA_DIR || (fs.existsSync("/app/data") ? "/app/data" : path.join(process.cwd(), "data"));
+// In Docker container, /app is the working directory and /app/data is mounted as volume.
+let DATA_DIR = process.env.DATA_DIR;
+if (!DATA_DIR) {
+  if (fs.existsSync("/app")) {
+    DATA_DIR = "/app/data";
+  } else {
+    DATA_DIR = path.join(process.cwd(), "data");
+  }
+}
 const DATA_FILE = path.join(DATA_DIR, "cuore_data.json");
 
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  try {
+// Ensure data directory and initial data file exist immediately on server startup
+try {
+  if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.warn("Could not create DATA_DIR:", err);
+    console.log("[STORAGE] Directorio creado en:", DATA_DIR);
   }
+  if (!fs.existsSync(DATA_FILE)) {
+    const initialData = {
+      entries: [],
+      analyticsData: [],
+      weightData: [],
+      user: "Marco",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), "utf-8");
+    console.log("[STORAGE] Archivo inicial creado en:", DATA_FILE);
+  }
+} catch (err) {
+  console.warn("[STORAGE] Error asegurando archivo/directorio de datos:", err);
 }
 
 // Initialize Gemini Client with User-Agent header for telemetry

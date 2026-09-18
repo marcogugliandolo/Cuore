@@ -1,8 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ChangeEvent } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Upload, Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Upload, Loader2, Trash2, ChevronDown, ChevronUp, HardDrive, CheckCircle2, Download } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { AnalyticsEntry, WeightEntry } from "../types";
 import { scanAnalytics } from "../api";
@@ -27,7 +27,46 @@ export function Progress({
   const [isUploading, setIsUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [showWeightHistory, setShowWeightHistory] = useState(false);
+  const [isSavingServer, setIsSavingServer] = useState(false);
+  const [serverStatus, setServerStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Comprobar estado de guardado en el servidor
+  const verifyServerStorage = async () => {
+    setIsSavingServer(true);
+    try {
+      const res = await fetch("/api/data");
+      if (res.ok) {
+        const data = await res.json();
+        const msg = `Volumen Docker OK (${data.entries?.length || 0} comidas, ${data.analyticsData?.length || 0} analíticas, ${data.weightData?.length || 0} pesos)`;
+        setServerStatus(msg);
+      } else {
+        setServerStatus("Error al conectar con el servidor");
+      }
+    } catch {
+      setServerStatus("Servidor no accesible");
+    } finally {
+      setIsSavingServer(false);
+      setTimeout(() => setServerStatus(null), 5000);
+    }
+  };
+
+  const downloadBackup = () => {
+    const backup = {
+      entries: JSON.parse(localStorage.getItem("modo_sano_entries") || "[]"),
+      analyticsData,
+      weightData,
+      user: localStorage.getItem("cuore_user") || "Marco",
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cuore_backup_${format(new Date(), "yyyyMMdd_HHmm")}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,22 +107,53 @@ export function Progress({
 
   return (
     <div className="space-y-6">
-      <header className="border-b-4 border-[#0f380f] pb-4 flex items-end justify-between">
+      <header className="border-b-4 border-[#0f380f] pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-3">
         <div>
           <h1 className="text-4xl font-bold tracking-tight uppercase">INFORMES</h1>
+          <p className="text-xs font-bold opacity-75">Sube tus analíticas médicas o revisa el estado del volumen</p>
         </div>
-        <div>
+        <div className="flex items-center gap-2">
+          {/* Botón Comprobar / Sincronizar con Volumen Docker */}
+          <button
+            onClick={verifyServerStorage}
+            disabled={isSavingServer}
+            className="flex items-center gap-1.5 px-3 py-2 border-2 border-[#0f380f] bg-[#8bac0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] text-xs font-bold uppercase rounded-lg transition-colors"
+            title="Comprobar persistencia en volumen Docker"
+          >
+            {isSavingServer ? <Loader2 size={16} className="animate-spin" /> : <HardDrive size={16} />}
+            <span>Volumen</span>
+          </button>
+
+          {/* Botón Descargar Copia JSON de seguridad */}
+          <button
+            onClick={downloadBackup}
+            className="flex items-center gap-1.5 px-3 py-2 border-2 border-[#0f380f] bg-[#8bac0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] text-xs font-bold uppercase rounded-lg transition-colors"
+            title="Descargar copia de seguridad en JSON"
+          >
+            <Download size={16} />
+            <span>Backup</span>
+          </button>
+
+          {/* Botón Subir Analítica */}
           <input type="file" accept="image/*,application/pdf" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
           <button 
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="flex items-center justify-center w-12 h-12 bg-[#0f380f] text-[#9bbc0f] rounded-lg font-bold transition-colors disabled:opacity-50"
+            className="flex items-center justify-center w-10 h-10 bg-[#0f380f] text-[#9bbc0f] rounded-lg font-bold transition-colors disabled:opacity-50 ml-1"
             title="Subir Analítica"
           >
-            {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Upload size={24} strokeWidth={3} />}
+            {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} strokeWidth={3} />}
           </button>
         </div>
       </header>
+
+      {/* Notificación de estado del servidor/volumen */}
+      {serverStatus && (
+        <div className="p-2.5 text-center font-bold text-sm rounded-lg bg-[#0f380f] text-[#9bbc0f] flex items-center justify-center gap-2">
+          <CheckCircle2 size={16} />
+          <span>{serverStatus}</span>
+        </div>
+      )}
 
       {statusMessage && (
         <div

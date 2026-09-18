@@ -80,33 +80,61 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
 
   // Estimación predictiva de triglicéridos basada en:
   // 1) Valor de la última analítica real (base médica)
-  // 2) Calidad de comidas registradas (alimentos "Bueno" reducen/mantienen; alimentos "Evitar" aumentan)
-  // 3) Evolución del peso (bajar de peso reduce fuertemente triglicéridos)
+  // 2) Calidad de comidas registradas DESDE la fecha de la analítica
+  // 3) Evolución del peso desde la fecha de la analítica
   const calculateTriglyceridesEstimate = () => {
     if (!latestAnalytics?.triglycerides) return null;
     const baseTrig = latestAnalytics.triglycerides;
-    
-    // Comidas registradas
-    const goodMeals = entries.filter(e => e.status === "Bueno").length;
-    const avoidMeals = entries.filter(e => e.status === "Evitar").length;
+
+    // Filtramos las comidas registradas desde la fecha de la analítica (o todas si no hay fecha válida)
+    const analyticsTime = new Date(latestAnalytics.date).getTime() || 0;
+    const relevantEntries = entries.filter(e => {
+      if (!analyticsTime) return true;
+      return e.timestamp >= analyticsTime;
+    });
+
+    const goodMeals = (relevantEntries.length > 0 ? relevantEntries : entries).filter(e => e.status === "Bueno").length;
+    const avoidMeals = (relevantEntries.length > 0 ? relevantEntries : entries).filter(e => e.status === "Evitar").length;
+    const moderateMeals = (relevantEntries.length > 0 ? relevantEntries : entries).filter(e => e.status === "Moderado").length;
+
+    // Impacto de comidas:
+    // Alimentos "Bueno" (omega-3, fibra, verdura): -2 a -3 mg/dL acumulativos
+    // Alimentos "Evitar" (azúcar, ultraprocesados, grasas saturadas, alcohol): +4 mg/dL
     const foodDelta = (avoidMeals * 4) - (goodMeals * 2.5);
 
-    // Delta de peso si hay historial
+    // Delta de peso en relación al peso inicial
     let weightDelta = 0;
-    if (weightData.length >= 2) {
-      const firstWeight = weightData[0].weight;
-      const lastWeight = weightData[weightData.length - 1].weight;
-      const diff = lastWeight - firstWeight;
-      // 1kg de bajada suele reducir ~6-8 mg/dL triglicéridos
-      weightDelta = diff * 7;
+    let initialWeight: number | null = null;
+    let currentWeight: number | null = null;
+
+    if (weightData.length >= 1) {
+      initialWeight = weightData[0].weight;
+      currentWeight = weightData[weightData.length - 1].weight;
+      if (weightData.length >= 2) {
+        const diff = currentWeight - initialWeight;
+        // La literatura médica estima que cada 1 kg de reducción de peso reduce entre 5 y 8 mg/dL de triglicéridos
+        weightDelta = diff * 7;
+      }
     }
 
-    const estimated = Math.max(50, Math.round(baseTrig + foodDelta + weightDelta));
+    const estimated = Math.max(45, Math.round(baseTrig + foodDelta + weightDelta));
     const difference = estimated - baseTrig;
 
     let trend: "improving" | "worsening" | "stable" = "stable";
-    if (difference <= -3) trend = "improving";
-    else if (difference >= 3) trend = "worsening";
+    if (difference <= -2) trend = "improving";
+    else if (difference >= 2) trend = "worsening";
+
+    // Clasificación médica según ATP III / Guías cardiovasculares:
+    // Normal: < 150 mg/dL
+    // Límite alto / Elevado: 150 - 199 mg/dL
+    // Alto: 200 - 499 mg/dL
+    // Muy alto: >= 500 mg/dL
+    const getRiskLevel = (val: number) => {
+      if (val < 150) return { label: "NORMAL (<150)", color: "text-[#0f380f]" };
+      if (val < 200) return { label: "LÍMITE ALTO (150-199)", color: "text-[#0f380f]" };
+      if (val < 500) return { label: "ELEVADO (>200)", color: "text-[#0f380f]" };
+      return { label: "MUY ELEVADO (≥500)", color: "text-[#0f380f]" };
+    };
 
     return {
       base: baseTrig,
@@ -116,6 +144,10 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       trend,
       goodMeals,
       avoidMeals,
+      moderateMeals,
+      totalMeals: relevantEntries.length,
+      baseRisk: getRiskLevel(baseTrig),
+      estimatedRisk: getRiskLevel(estimated),
     };
   };
 
@@ -169,6 +201,11 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
               <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-1">
                 Analítica Real
               </p>
+              {trigEstimate?.baseRisk && (
+                <span className="inline-block mt-1 text-[10px] font-black px-1 py-0.5 rounded bg-[#0f380f] text-[#9bbc0f]">
+                  {trigEstimate.baseRisk.label}
+                </span>
+              )}
             </div>
 
             {/* Estimado actual */}
@@ -200,6 +237,11 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
                   <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-1">
                     Estimado Hoy
                   </p>
+                  {trigEstimate.estimatedRisk && (
+                    <span className="inline-block mt-1 text-[10px] font-bold px-1 py-0.5 rounded border border-[#0f380f]">
+                      {trigEstimate.estimatedRisk.label}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div>
@@ -212,26 +254,39 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
             </div>
           </div>
 
-          {/* Fila inferior: Mensaje explicativo */}
-          <div className="pt-2 border-t-2 border-[#0f380f]/20">
+          {/* Fila inferior: Mensaje explicativo y desglose */}
+          <div className="pt-2 border-t-2 border-[#0f380f]/20 space-y-1.5">
             {trigEstimate ? (
-              <p className="text-xs font-bold leading-tight">
-                {trigEstimate.trend === "improving" && (
-                  <span className="text-[#0f380f]">
-                    ✓ ¡Mejorando! La comida saludable y el peso reducen tu nivel.
-                  </span>
-                )}
-                {trigEstimate.trend === "worsening" && (
-                  <span className="text-[#0f380f]">
-                    ▲ Cuidado: comidas a evitar o subida de peso están elevando el estimado.
-                  </span>
-                )}
-                {trigEstimate.trend === "stable" && (
-                  <span className="text-[#0f380f] opacity-90">
-                    • Nivel en rango estable según tus comidas y peso recientes.
-                  </span>
-                )}
-              </p>
+              <>
+                <p className="text-xs font-bold leading-tight">
+                  {trigEstimate.trend === "improving" && (
+                    <span className="text-[#0f380f]">
+                      ✓ ¡Mejorando! Tus comidas saludables y peso proyectan una bajada de {Math.abs(trigEstimate.difference)} mg/dL.
+                    </span>
+                  )}
+                  {trigEstimate.trend === "worsening" && (
+                    <span className="text-[#0f380f]">
+                      ▲ Cuidado: alimentos a evitar o subida de peso proyectan +{trigEstimate.difference} mg/dL.
+                    </span>
+                  )}
+                  {trigEstimate.trend === "stable" && (
+                    <span className="text-[#0f380f] opacity-90">
+                      • Base {trigEstimate.base} mg/dL (Elevado). Cada comida saludable o bajada de peso reducirá tu estimado.
+                    </span>
+                  )}
+                </p>
+                
+                {/* Resumen dinámico de impacto */}
+                <div className="flex items-center gap-3 text-[11px] font-bold opacity-80 pt-0.5">
+                  <span>Comidas: {trigEstimate.goodMeals} Buenas / {trigEstimate.avoidMeals} Evitar</span>
+                  {weightData.length >= 2 && (
+                    <span>
+                      Peso: {(weightData[weightData.length - 1].weight - weightData[0].weight) > 0 ? "+" : ""}
+                      {(weightData[weightData.length - 1].weight - weightData[0].weight).toFixed(1)} kg
+                    </span>
+                  )}
+                </div>
+              </>
             ) : (
               <p className="text-xs font-bold opacity-75 leading-tight">
                 Registra tu analítica en Informes para ver tu proyección inteligente.
