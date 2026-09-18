@@ -367,7 +367,182 @@ app.post("/api/analytics", upload.single("image"), async (req, res) => {
   }
 });
 
-// 4. Persistence endpoints for Docker Volume /app/data
+// Helper for deterministic fallback weekly analysis
+function fallbackWeeklyAnalysis(entries: any[], latestAnalytics?: any) {
+  const goodEntries = entries.filter((e) => e.status === "Bueno");
+  const avoidEntries = entries.filter((e) => e.status === "Evitar");
+  const moderateEntries = entries.filter((e) => e.status === "Moderado");
+  const total = entries.length;
+
+  let score: "Excelente" | "Favorable" | "Atención" | "Crítico" = "Favorable";
+  if (total === 0) {
+    return {
+      score: "Atención" as const,
+      summary: "No hay comidas registradas en la última semana. Registra tus comidas diarias para recibir consejos nutricionales personalizados.",
+      strengths: ["Compromiso inicial con el control de triglicéridos."],
+      risksToFix: ["Falta de registro continuo de comidas."],
+      keyPoints: [
+        "Comienza registrando tu desayuno, comida y cena cada día.",
+        "Prioriza pescados ricos en Omega-3 (sardina, salmón, caballa) 2-3 veces por semana.",
+        "Sustituye panes y arroces blancos por cereales enteros y verduras."
+      ],
+      tamagotchiVerdict: "¡Aliméntame con registros reales para que pueda cuidar de tu corazón!",
+      analyzedCount: 0,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  const avoidRatio = avoidEntries.length / total;
+  const goodRatio = goodEntries.length / total;
+
+  if (avoidRatio >= 0.4) score = "Crítico";
+  else if (avoidRatio >= 0.2) score = "Atención";
+  else if (goodRatio >= 0.6) score = "Excelente";
+  else score = "Favorable";
+
+  const strengths: string[] = [];
+  if (goodEntries.length > 0) {
+    const goodNames = Array.from(new Set(goodEntries.map((e) => e.name))).slice(0, 3).join(", ");
+    strengths.push(`Has incorporado alimentos protectores cardiovasculares: ${goodNames}.`);
+  }
+  if (avoidEntries.length === 0) {
+    strengths.push("Excelente disciplina: 0 comidas clasificadas como 'Evitar' en los últimos 7 días.");
+  } else if (avoidRatio < 0.25) {
+    strengths.push(`Baja frecuencia de alimentos inflamatorios (${avoidEntries.length} de ${total} comidas).`);
+  }
+  if (strengths.length === 0) {
+    strengths.push("Has mantenido el registro activo de tus hábitos alimentarios.");
+  }
+
+  const risksToFix: string[] = [];
+  if (avoidEntries.length > 0) {
+    const avoidNames = Array.from(new Set(avoidEntries.map((e) => e.name))).slice(0, 3).join(", ");
+    risksToFix.push(`Presencia de alimentos con alto impacto glucémico o lipídico: ${avoidNames}.`);
+  }
+  if (goodEntries.length < 3) {
+    risksToFix.push("Bajo aporte de fuentes concentradas de Omega-3 y fibra soluble en la semana.");
+  }
+  if (risksToFix.length === 0) {
+    risksToFix.push("Vigilar el tamaño de las porciones en carbohidratos complejos.");
+  }
+
+  const keyPoints: string[] = [
+    "Sustituye harinas y cereales refinados por legumbres o verduras en cada plato principal.",
+    "Asegura 2 a 3 raciones semanales de pescado azul (sardinas, caballa o salmón) para potenciar el efecto anti-triglicéridos del EPA/DHA.",
+    "Elimina bebidas azucaradas, zumos y alcohol: son el principal detonante de la síntesis hepática de triglicéridos."
+  ];
+
+  const trigVal = latestAnalytics?.triglycerides;
+  const trigNote = trigVal ? ` (tu última analítica marcó ${trigVal} mg/dL)` : "";
+
+  let tamagotchiVerdict = "¡Buen trabajo! Sigue sumando comidas verdes para bajar esos triglicéridos.";
+  if (score === "Excelente") {
+    tamagotchiVerdict = "¡( ^ _ ^ ) Tu corazón late fuerte y limpio! Estás en la senda ideal para reducir triglicéridos.";
+  } else if (score === "Crítico") {
+    tamagotchiVerdict = "( > _ < ) ¡Alerta! Demasiados azúcares y grasas nocivas. Tu hígado necesita un respiro urgente.";
+  } else if (score === "Atención") {
+    tamagotchiVerdict = "( = _ = ) Ojo con los pequeños descuidos. Corrige los alimentos a evitar esta semana.";
+  }
+
+  return {
+    score,
+    summary: `En los últimos 7 días has registrado ${total} comida(s)${trigNote}. Con un ${Math.round(goodRatio * 100)}% de opciones cardiosaludables y ${avoidEntries.length} alimento(s) de riesgo.`,
+    strengths,
+    risksToFix,
+    keyPoints,
+    tamagotchiVerdict,
+    analyzedCount: total,
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+// 4. Weekly Food Analysis with Gemini for Triglyceride Reduction
+app.post("/api/weekly-analysis", async (req, res) => {
+  const { entries, latestAnalytics, latestWeight, user } = req.body;
+  const recentEntries = Array.isArray(entries) ? entries : [];
+
+  if (recentEntries.length === 0) {
+    return res.json(fallbackWeeklyAnalysis([], latestAnalytics));
+  }
+
+  const foodSummaryList = recentEntries
+    .map((e: any, idx: number) => {
+      const dateStr = e.timestamp ? new Date(e.timestamp).toISOString().split("T")[0] : "";
+      const meal = e.mealType ? `[${e.mealType}]` : "";
+      return `${idx + 1}. ${dateStr} ${meal} ${e.name} -> Clasificación: ${e.status} (Motivo: ${e.reason || "N/A"})`;
+    })
+    .join("\n");
+
+  const prompt = `
+Eres un médico y nutricionista clínico de élite especializado en metabolismo lipídico y reducción rápida y sostenible de triglicéridos.
+Analiza con rigor las comidas registradas por el usuario (${user || "el paciente"}) durante la última semana y proporciona un informe clínico claro, empático y orientado a la acción.
+
+Contexto del paciente:
+- Última analítica de triglicéridos: ${latestAnalytics?.triglycerides ? `${latestAnalytics.triglycerides} mg/dL (Fecha: ${latestAnalytics.date})` : "No disponible (Objetivo clínico: <150 mg/dL)"}
+- Colesterol total: ${latestAnalytics?.cholesterol ? `${latestAnalytics.cholesterol} mg/dL` : "No disponible"}
+- Peso actual: ${latestWeight ? `${latestWeight} kg` : "No registrado"}
+- Total comidas analizadas en la semana: ${recentEntries.length}
+
+Listado de comidas de los últimos 7 días:
+${foodSummaryList}
+
+CRITERIOS MÉDICOS PARA TRIGLICÉRIDOS:
+1. Lo que más eleva los triglicéridos: azúcares simples (fructosa de zumos, refrescos, azúcar añadido), harinas refinadas (pan blanco, pasta, arroz), alcohol (incluso dosis moderadas elevan la síntesis hepática de VLDL) y grasas trans/saturadas.
+2. Lo que más los reduce: Omega-3 de cadena larga (pescado azul: sardina, caballa, salmón), fibra soluble (avena, legumbres, psyllium), aceite de oliva virgen extra, vegetales de hoja verde y ejercicio/déficit calórico.
+
+Devuelve ÚNICAMENTE un objeto JSON válido con este formato:
+{
+  "score": "Excelente" | "Favorable" | "Atención" | "Crítico",
+  "summary": "Resumen clínico de 2-3 frases directas sobre el balance de su semana respecto a los triglicéridos.",
+  "strengths": [
+    "Acierto 1 detectado en sus comidas reales",
+    "Acierto 2 detectado (si aplica)"
+  ],
+  "risksToFix": [
+    "Patrón o alimento perjudicial detectado que eleva triglicéridos",
+    "Segundo punto crítico a corregir"
+  ],
+  "keyPoints": [
+    "Consejo práctico 1 para bajar triglicéridos ajustado a lo que come",
+    "Consejo práctico 2 enfocado en sustituciones clave",
+    "Consejo práctico 3 sobre hábitos o tiempos de ingesta"
+  ],
+  "tamagotchiVerdict": "Frase corta y enérgica en tono mascota virtual retro (estilo Tamagotchi animado) para motivar al usuario."
+}
+`;
+
+  try {
+    const rawText = await callGeminiWithRetry(
+      {
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+        },
+      },
+      "weekly-analysis"
+    );
+
+    const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(cleanJson);
+
+    return res.json({
+      score: parsed.score || "Favorable",
+      summary: parsed.summary || "Análisis semanal completado.",
+      strengths: Array.isArray(parsed.strengths) ? parsed.strengths : [],
+      risksToFix: Array.isArray(parsed.risksToFix) ? parsed.risksToFix : [],
+      keyPoints: Array.isArray(parsed.keyPoints) ? parsed.keyPoints : [],
+      tamagotchiVerdict: parsed.tamagotchiVerdict || "¡Sigue cuidando tu corazón!",
+      analyzedCount: recentEntries.length,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    console.warn("Fallback weekly analysis triggered:", error?.message);
+    const fallback = fallbackWeeklyAnalysis(recentEntries, latestAnalytics);
+    return res.json(fallback);
+  }
+});
+
+// 5. Persistence endpoints for Docker Volume /app/data
 app.get("/api/data", async (req, res) => {
   try {
     if (fs.existsSync(DATA_FILE)) {

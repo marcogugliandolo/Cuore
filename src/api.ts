@@ -1,4 +1,4 @@
-import { FoodStatus } from "./types";
+import { FoodStatus, FoodEntry, AnalyticsEntry, WeeklyAdviceResponse } from "./types";
 
 export const classifyFood = async (food: string): Promise<{ status: FoodStatus, reason: string }> => {
   const hardcodedCheck = getHardcodedClassification(food.toLowerCase());
@@ -48,6 +48,25 @@ export const scanAnalytics = async (file: File): Promise<{ triglycerides: number
   }
   return data;
 }
+
+export const getWeeklyFoodAnalysis = async (payload: {
+  entries: FoodEntry[];
+  latestAnalytics?: AnalyticsEntry | null;
+  latestWeight?: number | null;
+  user?: string;
+}): Promise<WeeklyAdviceResponse> => {
+  const res = await fetch("/api/weekly-analysis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "No se pudo obtener el análisis semanal de Gemini.");
+  }
+  return data;
+};
 
 function getHardcodedClassification(food: string): { status: FoodStatus, reason: string } | null {
   const buenos = ["nuez", "nueces", "pipas", "girasol", "aceitunas", "aguacate", "sardinas", "caballa", "huevo duro", "huevo", "yogur natural", "palomitas", "chocolate negro", "hummus", "crudites", "kale", "boniato", "avena", "salmon", "salmón", "aceite de oliva"];

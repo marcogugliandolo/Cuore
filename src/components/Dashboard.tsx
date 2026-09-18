@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Trash2, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, Sparkles, Info } from "lucide-react";
-import { FoodEntry, AnalyticsEntry, WeightEntry } from "../types";
-import { classifyFood } from "../api";
+import { Loader2, Trash2, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, Sparkles, Info, RefreshCw, CheckCircle2, AlertTriangle, Lightbulb } from "lucide-react";
+import { FoodEntry, AnalyticsEntry, WeightEntry, WeeklyAdviceResponse } from "../types";
+import { classifyFood, getWeeklyFoodAnalysis } from "../api";
 import { cn } from "../lib/utils";
 
 interface DashboardProps {
@@ -31,11 +31,52 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
   const [confirmWeightDelete, setConfirmWeightDelete] = useState(false);
   const [showPastEntries, setShowPastEntries] = useState(false);
 
+  // Entradas de los últimos 7 días
+  const oneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const weeklyEntries = entries.filter((e) => e.timestamp >= oneWeekAgo);
+
+  // Estado del consejero semanal IA
+  const [weeklyAdvice, setWeeklyAdvice] = useState<WeeklyAdviceResponse | null>(() => {
+    try {
+      const saved = localStorage.getItem("cuore_weekly_advice");
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isLoadingAdvice, setIsLoadingAdvice] = useState(false);
+  const [adviceError, setAdviceError] = useState<string | null>(null);
+  const [isAdviceOpen, setIsAdviceOpen] = useState(true);
+
   const todayEntries = entries.filter((e) => isToday(e.timestamp));
   const pastEntries = entries.filter((e) => !isToday(e.timestamp));
 
   const latestAnalytics = analyticsData.length > 0 ? analyticsData[analyticsData.length - 1] : null;
   const todayWeightEntry = weightData.find(w => w.date === format(new Date(), "yyyy-MM-dd"));
+
+  const handleFetchWeeklyAdvice = async () => {
+    setIsLoadingAdvice(true);
+    setAdviceError(null);
+    try {
+      const latestWeightVal = weightData.length > 0 ? weightData[weightData.length - 1].weight : null;
+      const advice = await getWeeklyFoodAnalysis({
+        entries: weeklyEntries,
+        latestAnalytics,
+        latestWeight: latestWeightVal,
+        user: currentUser,
+      });
+      setWeeklyAdvice(advice);
+      setIsAdviceOpen(true);
+      try {
+        localStorage.setItem("cuore_weekly_advice", JSON.stringify(advice));
+      } catch {}
+    } catch (error: any) {
+      console.error("Error al obtener análisis semanal:", error);
+      setAdviceError(error?.message || "No se pudo generar el análisis. Reinténtalo.");
+    } finally {
+      setIsLoadingAdvice(false);
+    }
+  };
 
   const handleAddFood = async (e: FormEvent) => {
     e.preventDefault();
@@ -365,6 +406,206 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       >
         REGISTRAR
       </button>
+
+      {/* SECCIÓN: ANÁLISIS SEMANAL IA & CONSEJOS PARA TRIGLICÉRIDOS (GEMINI) */}
+      <section className="border-4 border-[#0f380f] bg-[#8bac0f]/30 rounded-xl p-4 md:p-5 space-y-4">
+        <div className="flex items-start justify-between gap-2 border-b-2 border-[#0f380f] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 md:w-9 md:h-9 bg-[#0f380f] text-[#9bbc0f] rounded-lg flex items-center justify-center shrink-0">
+              <Sparkles size={18} className="animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl md:text-2xl font-black uppercase tracking-wide">
+                  Consejero Semanal IA
+                </h2>
+                <span className="bg-[#0f380f] text-[#9bbc0f] text-[11px] md:text-xs font-bold uppercase px-2 py-0.5 rounded">
+                  Gemini
+                </span>
+              </div>
+              <p className="text-xs md:text-sm font-bold opacity-80 mt-0.5">
+                Evaluación de comidas de los últimos 7 días ({weeklyEntries.length} registradas)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {weeklyAdvice && (
+              <button
+                onClick={() => setIsAdviceOpen(!isAdviceOpen)}
+                className="p-1.5 border-2 border-[#0f380f] rounded hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+                title={isAdviceOpen ? "Plegar consejos" : "Desplegar consejos"}
+              >
+                {isAdviceOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Action button if not yet analyzed or refresh */}
+        {!weeklyAdvice && !isLoadingAdvice && (
+          <div className="text-center py-4 space-y-3">
+            <p className="text-base md:text-lg font-bold">
+              {weeklyEntries.length === 0
+                ? "Aún no tienes comidas registradas en los últimos 7 días. ¡Añade alimentos para que Gemini analice su impacto en tus triglicéridos!"
+                : `Analiza ${weeklyEntries.length} comida(s) de tu semana para obtener un diagnóstico personalizado de reducción de triglicéridos.`}
+            </p>
+            <button
+              onClick={handleFetchWeeklyAdvice}
+              disabled={isLoadingAdvice}
+              className="inline-flex items-center gap-2 bg-[#0f380f] text-[#9bbc0f] font-black text-lg md:text-xl px-5 py-2.5 border-2 border-[#0f380f] rounded-xl hover:opacity-90 active:scale-95 transition-all shadow-sm"
+            >
+              <Sparkles size={18} />
+              <span>GENERAR ANÁLISIS SEMANAL</span>
+            </button>
+          </div>
+        )}
+
+        {isLoadingAdvice && (
+          <div className="flex flex-col items-center justify-center py-6 space-y-3">
+            <Loader2 size={32} className="animate-spin text-[#0f380f]" />
+            <p className="text-lg md:text-xl font-black uppercase tracking-wider animate-pulse">
+              Consultando a Gemini con tus comidas semanales...
+            </p>
+            <p className="text-xs md:text-sm font-bold opacity-75">
+              Analizando perfil de grasas, azúcares simples y fibra para tus triglicéridos
+            </p>
+          </div>
+        )}
+
+        {adviceError && (
+          <div className="bg-[#0f380f] text-[#9bbc0f] p-3 rounded-lg text-sm md:text-base font-bold flex items-center justify-between gap-2">
+            <span>{adviceError}</span>
+            <button
+              onClick={handleFetchWeeklyAdvice}
+              className="underline hover:text-white shrink-0 uppercase"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* RESULTS CARD */}
+        {weeklyAdvice && !isLoadingAdvice && isAdviceOpen && (
+          <div className="space-y-4 pt-1">
+            {/* Header pill & Score */}
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#8bac0f] border-2 border-[#0f380f] p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <span className="text-xs md:text-sm font-bold uppercase opacity-80">
+                  Diagnóstico semanal:
+                </span>
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded text-xs md:text-sm font-black uppercase tracking-wide",
+                  weeklyAdvice.score === "Excelente" && "bg-[#0f380f] text-[#9bbc0f]",
+                  weeklyAdvice.score === "Favorable" && "bg-[#0f380f] text-[#9bbc0f]",
+                  weeklyAdvice.score === "Atención" && "bg-[#0f380f] text-yellow-300",
+                  weeklyAdvice.score === "Crítico" && "bg-rose-900 text-rose-100"
+                )}>
+                  {weeklyAdvice.score}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleFetchWeeklyAdvice}
+                  className="flex items-center gap-1 text-xs md:text-sm font-bold uppercase px-2 py-1 border border-[#0f380f] rounded hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+                  title="Actualizar consejos con nuevos registros"
+                >
+                  <RefreshCw size={12} />
+                  <span>Actualizar</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div className="p-3 bg-[#9bbc0f] border-2 border-[#0f380f] rounded-lg">
+              <p className="text-base md:text-lg font-bold leading-snug">
+                {weeklyAdvice.summary}
+              </p>
+            </div>
+
+            {/* Grid of Strengths vs Risks */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {/* Strengths */}
+              <div className="border-2 border-[#0f380f] bg-[#8bac0f]/40 p-3 rounded-lg space-y-2">
+                <div className="flex items-center gap-1.5 text-sm md:text-base font-black uppercase text-[#0f380f]">
+                  <CheckCircle2 size={16} strokeWidth={3} />
+                  <span>Aciertos Cardiosaludables</span>
+                </div>
+                {weeklyAdvice.strengths.length === 0 ? (
+                  <p className="text-xs md:text-sm font-bold opacity-75">Sin registros protectores destacados esta semana.</p>
+                ) : (
+                  <ul className="space-y-1.5 text-xs md:text-sm font-bold">
+                    {weeklyAdvice.strengths.map((s, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-[#0f380f] font-black">[+]</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              {/* Risks / To Fix */}
+              <div className="border-2 border-[#0f380f] bg-[#8bac0f]/20 p-3 rounded-lg space-y-2">
+                <div className="flex items-center gap-1.5 text-sm md:text-base font-black uppercase text-[#0f380f]">
+                  <AlertTriangle size={16} strokeWidth={3} />
+                  <span>Aspectos a Corregir</span>
+                </div>
+                {weeklyAdvice.risksToFix.length === 0 ? (
+                  <p className="text-xs md:text-sm font-bold opacity-75">¡Sin alimentos nocivos registrados esta semana!</p>
+                ) : (
+                  <ul className="space-y-1.5 text-xs md:text-sm font-bold">
+                    {weeklyAdvice.risksToFix.map((r, idx) => (
+                      <li key={idx} className="flex items-start gap-1.5">
+                        <span className="text-[#0f380f] font-black">[!]</span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+
+            {/* Personalized Actionable Tips */}
+            <div className="border-2 border-[#0f380f] bg-[#9bbc0f] p-3.5 rounded-lg space-y-2.5">
+              <div className="flex items-center gap-2 text-sm md:text-base font-black uppercase">
+                <Lightbulb size={18} />
+                <span>Consejos Personalizados para Bajar Triglicéridos</span>
+              </div>
+              <div className="space-y-2">
+                {weeklyAdvice.keyPoints.map((tip, idx) => (
+                  <div key={idx} className="flex items-start gap-2 text-xs md:text-sm font-bold bg-[#8bac0f]/40 p-2 rounded border border-[#0f380f]/40">
+                    <span className="w-5 h-5 bg-[#0f380f] text-[#9bbc0f] rounded-full flex items-center justify-center shrink-0 text-xs font-black">
+                      {idx + 1}
+                    </span>
+                    <p className="leading-snug">{tip}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Virtual Pet Bubble */}
+            {weeklyAdvice.tamagotchiVerdict && (
+              <div className="flex items-center gap-3 bg-[#0f380f] text-[#9bbc0f] p-3 rounded-xl border-2 border-[#0f380f]">
+                <div className="text-xl md:text-2xl font-black shrink-0 tracking-tighter">
+                  {weeklyAdvice.score === "Excelente" ? "( ^ _ ^ )" : weeklyAdvice.score === "Crítico" ? "( > _ < )" : "( = _ = )"}
+                </div>
+                <div className="text-xs md:text-sm font-bold uppercase leading-snug">
+                  "{weeklyAdvice.tamagotchiVerdict}"
+                </div>
+              </div>
+            )}
+
+            {/* Footer timestamp */}
+            {weeklyAdvice.generatedAt && (
+              <div className="flex justify-between items-center text-[10px] md:text-xs font-bold opacity-70 px-1">
+                <span>Último análisis generado: {format(new Date(weeklyAdvice.generatedAt), "dd/MM/yyyy HH:mm")}</span>
+                <span>Modelo: Gemini</span>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* ENTRIES LIST */}
       <section className="space-y-4 pt-4 border-t-4 border-[#0f380f]">

@@ -22,3 +22,14 @@ export interface WeightEntry {
   date: string;
   weight: number;
 }
+
+export interface WeeklyAdviceResponse {
+  score: "Excelente" | "Favorable" | "Atención" | "Crítico";
+  summary: string;
+  strengths: string[];
+  risksToFix: string[];
+  keyPoints: string[];
+  tamagotchiVerdict: string;
+  analyzedCount: number;
+  generatedAt?: string;
+}
