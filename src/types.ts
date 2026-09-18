@@ -3,6 +3,7 @@ export type FoodStatus = 'Bueno' | 'Moderado' | 'Evitar';
 export interface FoodEntry {
   id: string;
   name: string;
+  portion?: string;
   status: FoodStatus;
   reason: string;
   timestamp: number;

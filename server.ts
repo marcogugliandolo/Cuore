@@ -227,30 +227,38 @@ function fallbackFoodClassification(food: string) {
 }
 
 const classificationPrompt = `
-Eres un nutricionista experto. Clasifica el siguiente alimento/producto estrictamente como 'Bueno', 'Moderado' o 'Evitar' para una persona con triglicéridos muy altos (231 mg/dL) y el objetivo de bajarlos a <150.
-Criterio:
-- Bueno: grasas saludables (omega-3, monoinsaturadas), fibra, verduras, proteína magra, sin azúcares añadidos ni harinas refinadas.
-- Moderado: carbohidratos complejos o frutas enteras en cantidades normales, lácteos desnatados/naturales.
-- Evitar: azúcares simples, fritos, alcohol, carbohidratos refinados, grasas saturadas/trans, fruta desecada con azúcar, zumos.
+Eres un nutricionista experto en metabolismo lipídico. Clasifica el siguiente alimento/producto estrictamente como 'Bueno', 'Moderado' o 'Evitar' para una persona con triglicéridos muy altos (231 mg/dL) y el objetivo de bajarlos a <150.
+
+Criterio metabólico para triglicéridos:
+- Bueno: grasas cardiosaludables (omega-3 de pescado azul, monoinsaturadas de AOVE o aguacate), fibra soluble (avena, legumbres), verduras, proteína magra, sin azúcares añadidos ni harinas refinadas.
+- Moderado: carbohidratos complejos o frutas enteras en cantidades controladas, lácteos desnatados/naturales sin azúcar.
+- Evitar: azúcares simples (refrescos, zumos, bollería), fritos, alcohol (muy hepatotóxico para triglicéridos), harinas refinadas y ultraprocesados.
+
+CRITERIO CRUCIAL DE PROPORCIÓN / RACIÓN:
+- Si se indica una proporción (ej: "1 plato colmado", "media ración", "1 puñado de 30g", "150g", "2 cucharadas"):
+  * Considera la dosis: un alimento moderado en porción pequeña/controlada puede ser perfectamente aceptable o favorable, pero una porción gigante o doble puede disparar la síntesis de triglicéridos y convertirse en 'Evitar'.
+  * En el motivo ('reason'), haz una alusión directa a la proporción ingerida para orientar al paciente.
 
 Debes devolver el resultado ÚNICAMENTE en el siguiente formato JSON válido sin markdown ni texto extra:
 {
   "status": "Bueno" | "Moderado" | "Evitar",
-  "reason": "Explicación muy breve de máximo 3 líneas (en un tono directo pero empático)."
+  "reason": "Explicación breve de 2-3 frases directas sobre el impacto de este alimento y su proporción en los triglicéridos."
 }
 `;
 
 // 1. Text-based Classification
 app.post("/api/classify", async (req, res) => {
-  const { food } = req.body;
+  const { food, portion } = req.body;
   if (!food) {
     return res.status(400).json({ error: "Introduce un alimento para analizar" });
   }
 
+  const foodInfo = portion ? `Alimento: ${food}\nProporción/Cantidad consumida: ${portion}` : `Alimento: ${food}`;
+
   try {
     const rawText = await callGeminiWithRetry(
       {
-        contents: `${classificationPrompt}\nAlimento a analizar: ${food}`,
+        contents: `${classificationPrompt}\n${foodInfo}`,
         config: {
           responseMimeType: "application/json",
         },
@@ -287,7 +295,15 @@ app.post("/api/scan", upload.single("image"), async (req, res) => {
               mimeType,
             },
           },
-          `${classificationPrompt}\nAnaliza los ingredientes y tabla nutricional de este producto desde la imagen.`,
+          `Analiza los ingredientes y tabla nutricional de este producto o plato desde la imagen para una persona con triglicéridos altos.
+Clasifica como 'Bueno', 'Moderado' o 'Evitar'.
+Devuelve ÚNICAMENTE un JSON con:
+{
+  "name": "Nombre claro del producto o plato",
+  "status": "Bueno" | "Moderado" | "Evitar",
+  "reason": "Explicación breve de máximo 3 líneas.",
+  "suggestedPortion": "Porción o ración máxima aconsejada para control de triglicéridos (ej: 1 ración pequeña, 30g, 1 puñado, 1 rebanada, etc.)"
+}`,
         ],
         config: {
           responseMimeType: "application/json",
@@ -469,7 +485,8 @@ app.post("/api/weekly-analysis", async (req, res) => {
     .map((e: any, idx: number) => {
       const dateStr = e.timestamp ? new Date(e.timestamp).toISOString().split("T")[0] : "";
       const meal = e.mealType ? `[${e.mealType}]` : "";
-      return `${idx + 1}. ${dateStr} ${meal} ${e.name} -> Clasificación: ${e.status} (Motivo: ${e.reason || "N/A"})`;
+      const portionStr = e.portion ? ` (Proporción: ${e.portion})` : "";
+      return `${idx + 1}. ${dateStr} ${meal} ${e.name}${portionStr} -> Clasificación: ${e.status} (Motivo: ${e.reason || "N/A"})`;
     })
     .join("\n");
 
@@ -489,6 +506,7 @@ ${foodSummaryList}
 CRITERIOS MÉDICOS PARA TRIGLICÉRIDOS:
 1. Lo que más eleva los triglicéridos: azúcares simples (fructosa de zumos, refrescos, azúcar añadido), harinas refinadas (pan blanco, pasta, arroz), alcohol (incluso dosis moderadas elevan la síntesis hepática de VLDL) y grasas trans/saturadas.
 2. Lo que más los reduce: Omega-3 de cadena larga (pescado azul: sardina, caballa, salmón), fibra soluble (avena, legumbres, psyllium), aceite de oliva virgen extra, vegetales de hoja verde y ejercicio/déficit calórico.
+3. Proporciones y raciones registradas: Evalúa si las proporciones (ej: "1 plato", "ración grande", "media ración", "1 puñado") fueron prudentes o excesivas en carbohidratos y grasas, y dale pautas de ajuste de porciones en los consejos.
 
 Devuelve ÚNICAMENTE un objeto JSON válido con este formato:
 {

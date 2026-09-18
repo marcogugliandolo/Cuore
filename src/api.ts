@@ -1,15 +1,17 @@
 import { FoodStatus, FoodEntry, AnalyticsEntry, WeeklyAdviceResponse } from "./types";
 
-export const classifyFood = async (food: string): Promise<{ status: FoodStatus, reason: string }> => {
-  const hardcodedCheck = getHardcodedClassification(food.toLowerCase());
-  if (hardcodedCheck) {
-    return hardcodedCheck;
+export const classifyFood = async (food: string, portion?: string): Promise<{ status: FoodStatus, reason: string }> => {
+  if (!portion) {
+    const hardcodedCheck = getHardcodedClassification(food.toLowerCase());
+    if (hardcodedCheck) {
+      return hardcodedCheck;
+    }
   }
 
   const res = await fetch("/api/classify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ food })
+    body: JSON.stringify({ food, portion: portion?.trim() || undefined })
   });
 
   const data = await res.json().catch(() => ({}));
@@ -19,7 +21,7 @@ export const classifyFood = async (food: string): Promise<{ status: FoodStatus, 
   return data;
 }
 
-export const scanLabel = async (file: File): Promise<{ status: FoodStatus, reason: string }> => {
+export const scanLabel = async (file: File): Promise<{ name?: string, status: FoodStatus, reason: string, suggestedPortion?: string }> => {
   const formData = new FormData();
   formData.append("image", file);
   const res = await fetch("/api/scan", {
