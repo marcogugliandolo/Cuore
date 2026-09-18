@@ -1,8 +1,23 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
+import fsPromises from "fs/promises";
 import multer from "multer";
 import { GoogleGenAI } from "@google/genai";
 import { createServer as createViteServer } from "vite";
+
+// Storage directory path - supports Docker volume mounted at /app/data or local fallback ./data
+const DATA_DIR = process.env.DATA_DIR || (fs.existsSync("/app/data") ? "/app/data" : path.join(process.cwd(), "data"));
+const DATA_FILE = path.join(DATA_DIR, "cuore_data.json");
+
+// Ensure data directory exists
+if (!fs.existsSync(DATA_DIR)) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  } catch (err) {
+    console.warn("Could not create DATA_DIR:", err);
+  }
+}
 
 // Initialize Gemini Client with User-Agent header for telemetry
 const ai = new GoogleGenAI({
@@ -240,6 +255,55 @@ app.post("/api/analytics", upload.single("image"), async (req, res) => {
     res.status(503).json({
       error: "El servicio de análisis médico está saturado momentáneamente. Por favor, reintenta en unos segundos.",
     });
+  }
+});
+
+// 4. Persistence endpoints for Docker Volume /app/data
+app.get("/api/data", async (req, res) => {
+  try {
+    if (fs.existsSync(DATA_FILE)) {
+      const content = await fsPromises.readFile(DATA_FILE, "utf-8");
+      return res.json(JSON.parse(content));
+    }
+    // Return empty payload if not yet initialized
+    return res.json({
+      entries: [],
+      analyticsData: [],
+      weightData: [],
+      user: "Marco",
+    });
+  } catch (error: any) {
+    console.error("Error reading data file:", error);
+    res.status(500).json({ error: "No se pudieron cargar los datos del servidor" });
+  }
+});
+
+app.post("/api/data", async (req, res) => {
+  try {
+    const { entries, analyticsData, weightData, user } = req.body;
+    
+    // Ensure dir exists
+    if (!fs.existsSync(DATA_DIR)) {
+      await fsPromises.mkdir(DATA_DIR, { recursive: true });
+    }
+
+    const payload = {
+      entries: entries || [],
+      analyticsData: analyticsData || [],
+      weightData: weightData || [],
+      user: user || "Marco",
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Atomic-like write with temp file
+    const tempFile = `${DATA_FILE}.tmp`;
+    await fsPromises.writeFile(tempFile, JSON.stringify(payload, null, 2), "utf-8");
+    await fsPromises.rename(tempFile, DATA_FILE);
+
+    return res.json({ success: true, savedAt: payload.updatedAt });
+  } catch (error: any) {
+    console.error("Error saving data file:", error);
+    res.status(500).json({ error: "No se pudieron guardar los datos en el servidor" });
   }
 });
 

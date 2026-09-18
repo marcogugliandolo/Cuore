@@ -141,99 +141,119 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       </div>
 
       {/* STATS */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* TRIGLICÉRIDOS: ANALÍTICA REAL + ESTIMACIÓN SEGÚN COMIDA Y PESO */}
-        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between bg-[#8bac0f]/40">
-          <div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-bold uppercase tracking-wide">Triglicéridos</span>
-              {latestAnalytics && (
-                <span className="text-[11px] font-bold opacity-75">
-                  Analítica: {latestAnalytics.date}
+      <section className="space-y-4">
+        {/* TARJETA TRIGLICÉRIDOS */}
+        <div className="border-4 border-[#0f380f] p-3.5 rounded-xl bg-[#8bac0f]/40 space-y-3">
+          {/* Fila superior: Título y Fecha */}
+          <div className="flex items-center justify-between border-b-2 border-[#0f380f]/20 pb-1.5">
+            <span className="text-base font-bold uppercase tracking-wider">Triglicéridos</span>
+            {latestAnalytics ? (
+              <span className="text-xs font-bold opacity-80">
+                Última analítica: {latestAnalytics.date}
+              </span>
+            ) : (
+              <span className="text-xs font-bold opacity-60">Sin analítica</span>
+            )}
+          </div>
+
+          {/* Fila central: Datos de analítica vs estimado */}
+          <div className="grid grid-cols-2 gap-3 items-center">
+            {/* Analítica real */}
+            <div className="border-r-2 border-[#0f380f]/30 pr-2">
+              <div className="flex items-baseline gap-1">
+                <span className="text-3xl font-black leading-none">
+                  {latestAnalytics?.triglycerides ? latestAnalytics.triglycerides : "---"}
                 </span>
-              )}
+                <span className="text-xs font-bold opacity-75">mg/dL</span>
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-1">
+                Analítica Real
+              </p>
             </div>
 
-            <div className="flex items-baseline gap-3 mt-1">
-              <div>
-                <p className="text-3xl font-black leading-none">
-                  {latestAnalytics?.triglycerides ? `${latestAnalytics.triglycerides}` : "---"}
-                </p>
-                <p className="text-[10px] font-bold uppercase opacity-75 mt-0.5">Última Analítica</p>
-              </div>
-
-              {trigEstimate && (
-                <div className="border-l-2 border-[#0f380f]/40 pl-3">
-                  <div className="flex items-center gap-1">
-                    <p className="text-2xl font-black leading-none">
+            {/* Estimado actual */}
+            <div className="pl-1">
+              {trigEstimate ? (
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-3xl font-black leading-none">
                       ~{trigEstimate.estimated}
-                    </p>
+                    </span>
                     {trigEstimate.trend === "improving" && (
-                      <span className="text-xs font-black px-1 rounded bg-[#0f380f] text-[#9bbc0f] flex items-center">
-                        <TrendingDown size={12} className="mr-0.5" />
+                      <span className="text-[11px] font-black px-1.5 py-0.5 rounded bg-[#0f380f] text-[#9bbc0f] inline-flex items-center whitespace-nowrap">
+                        <TrendingDown size={11} className="mr-0.5" />
                         {trigEstimate.difference}
                       </span>
                     )}
                     {trigEstimate.trend === "worsening" && (
-                      <span className="text-xs font-black px-1 rounded bg-[#0f380f] text-[#9bbc0f] flex items-center">
-                        <TrendingUp size={12} className="mr-0.5" />
+                      <span className="text-[11px] font-black px-1.5 py-0.5 rounded bg-[#0f380f] text-[#9bbc0f] inline-flex items-center whitespace-nowrap">
+                        <TrendingUp size={11} className="mr-0.5" />
                         +{trigEstimate.difference}
                       </span>
                     )}
                     {trigEstimate.trend === "stable" && (
-                      <span className="text-xs font-bold px-1 rounded border border-[#0f380f]">
-                        ESTABLE
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-[#0f380f] uppercase whitespace-nowrap">
+                        Estable
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] font-bold uppercase opacity-75 mt-0.5">Estimado Actual</p>
+                  <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-1">
+                    Estimado Hoy
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <span className="text-2xl font-black opacity-50">---</span>
+                  <p className="text-[11px] font-bold uppercase tracking-tight opacity-50 mt-1">
+                    Sin estimación
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Feedback explicativo de evolución */}
-          <div className="mt-3 pt-2 border-t-2 border-[#0f380f]/30">
+          {/* Fila inferior: Mensaje explicativo */}
+          <div className="pt-2 border-t-2 border-[#0f380f]/20">
             {trigEstimate ? (
               <p className="text-xs font-bold leading-tight">
                 {trigEstimate.trend === "improving" && (
                   <span className="text-[#0f380f]">
-                    ✓ ¡Mejorando! Tus comidas saludables y peso están reduciendo la carga.
+                    ✓ ¡Mejorando! La comida saludable y el peso reducen tu nivel.
                   </span>
                 )}
                 {trigEstimate.trend === "worsening" && (
                   <span className="text-[#0f380f]">
-                    ▲ Cuidado: alimentos a evitar o peso están subiendo el estimado.
+                    ▲ Cuidado: comidas a evitar o subida de peso están elevando el estimado.
                   </span>
                 )}
                 {trigEstimate.trend === "stable" && (
                   <span className="text-[#0f380f] opacity-90">
-                    • En rango estable según tus registros recientes.
+                    • Nivel en rango estable según tus comidas y peso recientes.
                   </span>
                 )}
               </p>
             ) : (
-              <p className="text-[11px] font-bold opacity-75 leading-tight">
-                Sube una analítica en Informes para activar la predicción inteligente.
+              <p className="text-xs font-bold opacity-75 leading-tight">
+                Registra tu analítica en Informes para ver tu proyección inteligente.
               </p>
             )}
           </div>
         </div>
 
-        {/* PESO */}
-        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between relative bg-[#8bac0f]/40">
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-bold uppercase">Peso</p>
+        {/* TARJETA PESO */}
+        <div className="border-4 border-[#0f380f] p-3.5 rounded-xl bg-[#8bac0f]/40 space-y-2">
+          <div className="flex items-center justify-between border-b-2 border-[#0f380f]/20 pb-1.5">
+            <span className="text-base font-bold uppercase tracking-wider">Peso de Hoy</span>
             {todayWeightEntry && onDeleteWeight && (
               confirmWeightDelete ? (
-                <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-1.5 py-0.5 rounded text-xs">
+                <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-2 py-0.5 rounded text-xs">
                   <span>¿Borrar?</span>
                   <button
                     onClick={() => {
                       onDeleteWeight(todayWeightEntry.id);
                       setConfirmWeightDelete(false);
                     }}
-                    className="font-black text-[#9bbc0f] hover:underline"
+                    className="font-black text-[#9bbc0f] underline ml-1"
                   >
                     SÍ
                   </button>
@@ -248,7 +268,7 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
               ) : (
                 <button
                   onClick={() => setConfirmWeightDelete(true)}
-                  className="border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] px-1.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                  className="border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
                   title="Eliminar registro de peso de hoy"
                 >
                   <Trash2 size={11} /> BORRAR
@@ -256,9 +276,28 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
               )
             )}
           </div>
-          <p className="text-3xl font-black mt-2">
-            {todayWeightEntry?.weight ? `${todayWeightEntry.weight} kg` : "--- kg"}
-          </p>
+
+          <div className="flex items-baseline justify-between pt-1">
+            <div>
+              <span className="text-3xl font-black">
+                {todayWeightEntry?.weight ? `${todayWeightEntry.weight} kg` : "--- kg"}
+              </span>
+              <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-0.5">
+                {todayWeightEntry ? "Registrado hoy" : "Sin registrar hoy"}
+              </p>
+            </div>
+            {!todayWeightEntry && (
+              <button
+                onClick={() => {
+                  setModalTab("peso");
+                  setIsModalOpen(true);
+                }}
+                className="text-xs font-bold uppercase px-2 py-1 border-2 border-[#0f380f] rounded hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+              >
+                + Añadir Peso
+              </button>
+            )}
+          </div>
         </div>
       </section>
 

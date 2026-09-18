@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Login } from "./components/Login";
 import { Layout } from "./components/Layout";
 import { Dashboard } from "./components/Dashboard";
@@ -30,6 +30,43 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  // Track if initial fetch from backend completed so we don't overwrite server data with empty state
+  const isServerLoaded = useRef(false);
+
+  // 1. Cargar datos desde el backend (volumen /app/data en Docker) al iniciar
+  useEffect(() => {
+    async function loadServerData() {
+      try {
+        const res = await fetch("/api/data");
+        if (res.ok) {
+          const serverData = await res.json();
+          if (serverData && (serverData.entries || serverData.analyticsData || serverData.weightData)) {
+            // Si el servidor tiene datos, priorizamos los del servidor o los combinamos con lo local
+            if (serverData.entries && serverData.entries.length > 0) {
+              setEntries(serverData.entries);
+            }
+            if (serverData.analyticsData && serverData.analyticsData.length > 0) {
+              setAnalyticsData(serverData.analyticsData);
+            }
+            if (serverData.weightData && serverData.weightData.length > 0) {
+              setWeightData(serverData.weightData);
+            }
+            if (serverData.user) {
+              setCurrentUser(serverData.user);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Could not sync with /api/data on startup:", err);
+      } finally {
+        isServerLoaded.current = true;
+      }
+    }
+
+    loadServerData();
+  }, []);
+
+  // 2. Guardar en localStorage de forma instantánea
   useEffect(() => {
     localStorage.setItem("modo_sano_entries", JSON.stringify(entries));
   }, [entries]);
@@ -41,6 +78,30 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("cuore_weight", JSON.stringify(weightData));
   }, [weightData]);
+
+  // 3. Sincronizar y persistir automáticamente en el servidor (/app/data en Docker)
+  useEffect(() => {
+    if (!isServerLoaded.current) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        await fetch("/api/data", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            entries,
+            analyticsData,
+            weightData,
+            user: currentUser,
+          }),
+        });
+      } catch (e) {
+        console.error("Error saving data to /api/data:", e);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [entries, analyticsData, weightData, currentUser]);
 
   const handleLogin = (user: string) => {
     localStorage.setItem("modo_sano_auth", "true");
