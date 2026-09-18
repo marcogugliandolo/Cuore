@@ -10,43 +10,48 @@ interface TamagotchiShellProps {
 
 export function TamagotchiShell({ children, onLogout, showButtons = false, buttons }: TamagotchiShellProps) {
   return (
-    <div className="min-h-screen bg-teal-600 flex items-center justify-center p-2 sm:p-4 font-sans selection:bg-[#0f380f] selection:text-[#9bbc0f]">
-      {/* ---------------- TAMAGOTCHI DEVICE SHELL ---------------- */}
-      <div className="w-full max-w-md bg-rose-500 rounded-[3rem] p-4 sm:p-6 shadow-[inset_-4px_-8px_0px_rgba(0,0,0,0.2),0_10px_30px_rgba(0,0,0,0.5)] border-4 border-slate-900 relative flex flex-col h-[95vh]">
+    <div className="min-h-screen bg-[#9bbc0f] sm:bg-teal-600 sm:flex sm:items-center sm:justify-center sm:p-4 font-sans selection:bg-[#0f380f] selection:text-[#9bbc0f]">
+      {/* ---------------- TAMAGOTCHI DEVICE SHELL / FULLSCREEN MOBILE ---------------- */}
+      <div className="w-full sm:max-w-md bg-[#9bbc0f] sm:bg-rose-500 sm:rounded-[3rem] sm:p-5 sm:shadow-[inset_-4px_-8px_0px_rgba(0,0,0,0.2),0_10px_30px_rgba(0,0,0,0.5)] sm:border-4 sm:border-slate-900 relative flex flex-col h-screen sm:h-[95vh] overflow-hidden">
         
-        {/* Top decoration */}
-        <div className="flex justify-between items-start mb-4 px-2">
-          <div className="flex items-center gap-2 mt-2">
-            <Heart size={24} className="text-white fill-white drop-shadow-md" />
-            <h1 className="text-white font-black tracking-widest text-3xl drop-shadow-md font-[VT323] uppercase">CUORE</h1>
+        {/* Top bar: In mobile, a sleek retro green LCD header bar; in desktop, the Tamagotchi shell top */}
+        <div className="flex justify-between items-center px-4 py-3 sm:px-2 sm:mb-4 bg-[#8bac0f] sm:bg-transparent border-b-4 border-[#0f380f] sm:border-b-0 shrink-0 z-20">
+          <div className="flex items-center gap-2">
+            <Heart size={22} className="text-[#0f380f] sm:text-white fill-current sm:drop-shadow-md" />
+            <h1 className="text-[#0f380f] sm:text-white font-black tracking-widest text-2xl sm:text-3xl sm:drop-shadow-md font-[VT323] uppercase">
+              CUORE
+            </h1>
           </div>
           {onLogout && (
-            <div className="flex flex-col items-center gap-1">
-              <span className="text-rose-200 font-bold text-sm tracking-widest font-[VT323] leading-none drop-shadow-sm uppercase">Off</span>
+            <div className="flex items-center gap-2 sm:flex-col sm:gap-1">
+              <span className="hidden sm:inline text-rose-200 font-bold text-xs tracking-widest font-[VT323] uppercase">
+                Off
+              </span>
               <button
                 onClick={onLogout}
                 title="Apagar (Cerrar sesión)"
-                className="w-8 h-8 bg-rose-700 text-rose-100 rounded-full flex items-center justify-center border-t-2 border-rose-400 border-b-4 border-slate-900 shadow-[0_4px_4px_rgba(0,0,0,0.3)] active:border-b-0 active:translate-y-1 transition-all hover:bg-rose-600 hover:text-white"
+                className="flex items-center gap-1.5 px-2.5 py-1 sm:p-0 sm:w-8 sm:h-8 bg-[#0f380f] text-[#9bbc0f] sm:bg-rose-700 sm:text-rose-100 rounded-md sm:rounded-full justify-center border-2 sm:border-t-2 border-[#0f380f] sm:border-rose-400 sm:border-b-4 sm:border-slate-900 shadow-sm sm:shadow-[0_4px_4px_rgba(0,0,0,0.3)] active:scale-95 sm:active:border-b-0 sm:active:translate-y-1 transition-all hover:opacity-90 font-[VT323] font-bold text-sm"
               >
-                <Power size={14} strokeWidth={4} />
+                <Power size={14} strokeWidth={3.5} />
+                <span className="sm:hidden uppercase tracking-wider text-xs">Salir</span>
               </button>
             </div>
           )}
         </div>
 
-        {/* ---------------- LCD SCREEN ---------------- */}
-        <div className="flex-1 bg-[#9bbc0f] border-4 border-slate-900 rounded-lg shadow-[inset_4px_4px_0px_rgba(0,0,0,0.1)] relative overflow-hidden flex flex-col">
-          {/* Screen inner shadow for depth */}
-          <div className="absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(15,56,15,0.2)] z-50"></div>
+        {/* ---------------- LCD SCREEN (Edge-to-edge on mobile, framed on desktop) ---------------- */}
+        <div className="flex-1 bg-[#9bbc0f] sm:border-4 sm:border-slate-900 sm:rounded-xl sm:shadow-[inset_4px_4px_0px_rgba(0,0,0,0.1)] relative overflow-hidden flex flex-col min-h-0">
+          {/* Subtle CRT / LCD scanline vignette effect only on desktop frame */}
+          <div className="hidden sm:block absolute inset-0 pointer-events-none shadow-[inset_0_0_20px_rgba(15,56,15,0.2)] z-30"></div>
           
           <main className="flex-1 overflow-y-auto p-4 text-[#0f380f] relative z-10 custom-scrollbar font-[VT323]">
             {children}
           </main>
         </div>
 
-        {/* ---------------- BUTTONS ---------------- */}
+        {/* ---------------- NAVIGATION BUTTONS ---------------- */}
         {showButtons && buttons && (
-          <div className="mt-6 mb-2 flex justify-around items-center px-4">
+          <div className="shrink-0 z-20 bg-[#8bac0f] sm:bg-transparent border-t-4 border-[#0f380f] sm:border-t-0 py-2.5 px-3 sm:py-0 sm:mt-5 sm:mb-2 flex justify-around items-center">
             {buttons}
           </div>
         )}

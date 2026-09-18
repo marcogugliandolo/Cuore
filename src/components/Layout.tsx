@@ -26,17 +26,22 @@ export function Layout({ children, activeTab, setActiveTab, onLogout }: LayoutPr
       <button
         key={tab.id}
         onClick={() => setActiveTab(tab.id)}
-        className="flex flex-col items-center gap-2 group"
+        className="flex flex-col items-center gap-1 sm:gap-2 group flex-1 max-w-[90px] py-1 transition-transform active:scale-95"
       >
         <div className={cn(
-          "w-12 h-12 sm:w-14 sm:h-14 rounded-full border-4 border-slate-900 flex items-center justify-center transition-all",
+          "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-full border-2 sm:border-4 border-[#0f380f] sm:border-slate-900 flex items-center justify-center transition-all",
           isActive 
-            ? "bg-yellow-400 translate-y-1 shadow-none" 
-            : "bg-blue-400 shadow-[0_4px_0_#0f172a] group-hover:translate-y-0.5 group-hover:shadow-[0_2px_0_#0f172a]"
+            ? "bg-[#0f380f] text-[#9bbc0f] sm:bg-yellow-400 sm:text-slate-900 translate-y-0.5 sm:translate-y-1 shadow-none" 
+            : "bg-[#9bbc0f] text-[#0f380f] sm:bg-blue-400 sm:text-slate-900 shadow-[0_2px_0_#0f380f] sm:shadow-[0_4px_0_#0f172a] group-hover:translate-y-0.5"
         )}>
-          <tab.icon size={20} className="text-slate-900" strokeWidth={3} />
+          <tab.icon size={18} className="sm:w-5 sm:h-5" strokeWidth={3} />
         </div>
-        <span className="text-white font-bold text-sm tracking-wider drop-shadow-md font-[VT323]">
+        <span className={cn(
+          "text-xs sm:text-sm font-bold tracking-wider font-[VT323] uppercase transition-colors",
+          isActive 
+            ? "text-[#0f380f] font-black sm:text-white sm:drop-shadow-md" 
+            : "text-[#0f380f]/80 sm:text-white/90 sm:drop-shadow-md"
+        )}>
           {tab.label}
         </span>
       </button>
