@@ -23,19 +23,11 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
   const [modalTab, setModalTab] = useState<"comida" | "peso">("comida");
   
   const [newItem, setNewItem] = useState("");
-  const [portion, setPortion] = useState("1 plato / ración");
+  const [foodAmount, setFoodAmount] = useState("");
+  const [foodUnit, setFoodUnit] = useState<"gr" | "ml">("gr");
   const [mealType, setMealType] = useState<"Desayuno" | "Comida" | "Cena" | "Otro">("Comida");
   const [isAdding, setIsAdding] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-
-  const PORTION_PRESETS = [
-    "1 plato / ración",
-    "Media ración (poco)",
-    "Ración grande (abundante)",
-    "1 puñado (~30g)",
-    "1 vaso / taza",
-    "1 unidad / pieza",
-  ];
   
   const [todayWeight, setTodayWeight] = useState("");
   const [confirmWeightDelete, setConfirmWeightDelete] = useState(false);
@@ -94,17 +86,18 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
     setIsAdding(true);
     setModalError(null);
     try {
-      const trimmedPortion = portion.trim() || undefined;
-      const { status, reason } = await classifyFood(newItem, trimmedPortion);
+      const calculatedPortion = foodAmount.trim() ? `${foodAmount.trim()} ${foodUnit}` : undefined;
+      const { status, reason } = await classifyFood(newItem, calculatedPortion);
       onAddEntry({ 
         name: newItem.trim(), 
-        portion: trimmedPortion,
+        portion: calculatedPortion,
         status, 
         reason, 
         mealType 
       });
       setNewItem("");
-      setPortion("1 plato / ración");
+      setFoodAmount("");
+      setFoodUnit("gr");
       setIsModalOpen(false);
     } catch (error: any) {
       setModalError(error?.message || "Error al analizar el alimento.");
@@ -165,7 +158,12 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
     for (const item of itemsToCalc) {
       const p = (item.portion || "").toLowerCase();
       let mult = 1;
-      if (p.includes("grande") || p.includes("doble") || p.includes("mucho")) {
+      const numMatch = p.match(/(\d+(?:\.\d+)?)\s*(gr|g|ml)?/);
+      if (numMatch && numMatch[1]) {
+        const val = parseFloat(numMatch[1]);
+        if (val >= 250) mult = 1.4;
+        else if (val <= 60) mult = 0.65;
+      } else if (p.includes("grande") || p.includes("doble") || p.includes("mucho")) {
         mult = 1.4;
       } else if (p.includes("media") || p.includes("poco") || p.includes("puñado") || p.includes("cucharada")) {
         mult = 0.65;
@@ -695,23 +693,24 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
           onClick={(e) => {
             if (e.target === e.currentTarget) setIsModalOpen(false);
           }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/60 backdrop-blur-sm overflow-y-auto"
         >
-          <div className="w-full max-w-md sm:max-w-lg bg-[#9bbc0f] border-4 sm:border-8 border-[#0f380f] rounded-2xl p-4 sm:p-6 shadow-2xl relative font-[VT323] text-[#0f380f] my-auto max-h-[92dvh] flex flex-col">
+          <div className="w-full max-w-md sm:max-w-lg bg-[#9bbc0f] border-4 sm:border-6 border-[#0f380f] rounded-2xl p-3.5 sm:p-5 shadow-2xl relative font-[VT323] text-[#0f380f] my-auto max-h-[94vh] flex flex-col">
             
-            {/* Botón cerrar */}
-            <button 
-              onClick={() => setIsModalOpen(false)}
-              aria-label="Cerrar ventana"
-              className="absolute top-2 right-2 text-2xl font-black w-9 h-9 flex justify-center items-center hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors rounded-full border-2 border-[#0f380f]"
-            >
-              X
-            </button>
-
-            {/* Header del Modal */}
-            <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-center uppercase tracking-wide">
-              Nuevo Registro
-            </h2>
+            {/* Header del Modal con botón cerrar integrado */}
+            <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-[#0f380f]/40 shrink-0">
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-wide">
+                Nuevo Registro
+              </h2>
+              <button 
+                type="button"
+                onClick={() => setIsModalOpen(false)}
+                aria-label="Cerrar ventana"
+                className="w-8 h-8 flex items-center justify-center text-lg font-black border-2 border-[#0f380f] rounded-full hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+              >
+                ✕
+              </button>
+            </div>
 
             {modalError && (
               <div className="bg-[#0f380f] text-[#9bbc0f] p-2 text-center font-bold text-base sm:text-lg rounded-lg mb-3 animate-pulse">
@@ -720,89 +719,126 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
             )}
 
             {/* Pestañas de Comida / Peso */}
-            <div className="flex border-4 border-[#0f380f] rounded-lg mb-4 overflow-hidden font-bold shrink-0">
+            <div className="flex border-3 sm:border-4 border-[#0f380f] rounded-lg mb-3 overflow-hidden font-bold shrink-0">
               <button 
+                type="button"
                 onClick={() => setModalTab("comida")}
-                className={cn("flex-1 py-1.5 sm:py-2 text-lg sm:text-xl transition-colors", modalTab === "comida" ? "bg-[#0f380f] text-[#9bbc0f]" : "hover:bg-[#8bac0f]")}
+                className={cn("flex-1 py-1 sm:py-1.5 text-lg sm:text-xl transition-colors", modalTab === "comida" ? "bg-[#0f380f] text-[#9bbc0f]" : "hover:bg-[#8bac0f]")}
               >
                 Comida
               </button>
-              <div className="w-1 bg-[#0f380f]"></div>
+              <div className="w-0.5 bg-[#0f380f]"></div>
               <button 
+                type="button"
                 onClick={() => setModalTab("peso")}
-                className={cn("flex-1 py-1.5 sm:py-2 text-lg sm:text-xl transition-colors", modalTab === "peso" ? "bg-[#0f380f] text-[#9bbc0f]" : "hover:bg-[#8bac0f]")}
+                className={cn("flex-1 py-1 sm:py-1.5 text-lg sm:text-xl transition-colors", modalTab === "peso" ? "bg-[#0f380f] text-[#9bbc0f]" : "hover:bg-[#8bac0f]")}
               >
                 Peso
               </button>
             </div>
 
-            {/* Contenido scrolleable del formulario */}
-            <div className="overflow-y-auto pr-1 flex-1">
+            {/* Contenido del formulario con botón GUARDAR fijo al pie */}
+            <div className="flex-1 min-h-0 flex flex-col">
               {modalTab === "comida" && (
-                <form onSubmit={handleAddFood} className="space-y-4">
-                  <div>
-                    <label className="block text-lg sm:text-xl font-bold mb-1">¿Qué has comido?</label>
-                    <input
-                      type="text"
-                      value={newItem}
-                      onChange={(e) => setNewItem(e.target.value)}
-                      placeholder="Ej: Nueces, Salmón con arroz, Pizza..."
-                      className="w-full border-3 sm:border-4 border-[#0f380f] bg-transparent p-2.5 sm:p-3 text-xl sm:text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
-                      disabled={isAdding}
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* PROPORCIÓN / CANTIDAD */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-lg sm:text-xl font-bold">Proporción / Ración</label>
-                      <span className="text-[11px] sm:text-xs font-bold uppercase opacity-80">
-                        Ajusta impacto
-                      </span>
+                <form onSubmit={handleAddFood} className="flex flex-col flex-1 min-h-0">
+                  {/* Campos scrolleables si la pantalla es reducida */}
+                  <div className="overflow-y-auto pr-1 flex-1 space-y-2.5">
+                    <div>
+                      <label className="block text-base sm:text-lg font-bold mb-0.5">¿Qué has comido?</label>
+                      <input
+                        type="text"
+                        value={newItem}
+                        onChange={(e) => setNewItem(e.target.value)}
+                        placeholder="Ej: Nueces, Salmón con arroz, Pizza..."
+                        className="w-full border-2 sm:border-3 border-[#0f380f] bg-transparent p-2 text-xl sm:text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
+                        disabled={isAdding}
+                        autoFocus
+                      />
                     </div>
 
-                    {/* Botones rápidos de proporciones habituales */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mb-2">
-                      {PORTION_PRESETS.map((preset) => (
-                        <button
-                          type="button"
-                          key={preset}
-                          onClick={() => setPortion(preset)}
-                          className={cn(
-                            "border-2 border-[#0f380f] py-1 px-1.5 text-xs sm:text-sm font-bold transition-all rounded text-center truncate",
-                            portion === preset
-                              ? "bg-[#0f380f] text-[#9bbc0f] shadow-sm"
-                              : "bg-[#8bac0f]/50 hover:bg-[#8bac0f]"
+                    {/* CANTIDAD: GRAMOS O ML */}
+                    <div>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <label className="block text-base sm:text-lg font-bold">Cantidad ({foodUnit === "gr" ? "Gramos" : "Mililitros"})</label>
+                        <span className="text-[11px] font-bold uppercase opacity-80">
+                          Opcional
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          step="any"
+                          value={foodAmount}
+                          onChange={(e) => setFoodAmount(e.target.value)}
+                          placeholder={`Ej: ${foodUnit === "gr" ? "150" : "250"}`}
+                          className="flex-1 border-2 sm:border-3 border-[#0f380f] bg-transparent p-1.5 text-xl sm:text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
+                          disabled={isAdding}
+                        />
+
+                        {/* Selector de unidad: GR vs ML */}
+                        <div className="flex border-2 sm:border-3 border-[#0f380f] rounded overflow-hidden shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setFoodUnit("gr")}
+                            className={cn(
+                              "px-3 py-1 text-lg sm:text-xl font-black transition-colors uppercase",
+                              foodUnit === "gr" 
+                                ? "bg-[#0f380f] text-[#9bbc0f]" 
+                                : "bg-[#8bac0f]/40 hover:bg-[#8bac0f]"
+                            )}
+                          >
+                            GR
+                          </button>
+                          <div className="w-0.5 bg-[#0f380f]" />
+                          <button
+                            type="button"
+                            onClick={() => setFoodUnit("ml")}
+                            className={cn(
+                              "px-3 py-1 text-lg sm:text-xl font-black transition-colors uppercase",
+                              foodUnit === "ml" 
+                                ? "bg-[#0f380f] text-[#9bbc0f]" 
+                                : "bg-[#8bac0f]/40 hover:bg-[#8bac0f]"
                           )}
                         >
-                          {preset}
+                          ML
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Botones de sugerencias de cantidades comunes */}
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(foodUnit === "gr" 
+                        ? ["30", "50", "100", "150", "200", "250"] 
+                        : ["100", "150", "200", "250", "330", "500"]
+                      ).map((val) => (
+                        <button
+                          type="button"
+                          key={val}
+                          onClick={() => setFoodAmount(val)}
+                          className={cn(
+                            "border-2 border-[#0f380f] px-2 py-0.5 text-xs sm:text-sm font-bold rounded transition-colors",
+                            foodAmount === val ? "bg-[#0f380f] text-[#9bbc0f]" : "bg-[#9bbc0f]/60 hover:bg-[#8bac0f]"
+                          )}
+                        >
+                          {val} {foodUnit}
                         </button>
                       ))}
                     </div>
-
-                    {/* Input personalizado para gramos o ración exacta */}
-                    <input
-                      type="text"
-                      value={portion}
-                      onChange={(e) => setPortion(e.target.value)}
-                      placeholder="O escribe cantidad: ej: 150g, 2 rebanadas, 1 vaso..."
-                      className="w-full border-2 sm:border-4 border-[#0f380f] bg-transparent p-2 text-lg sm:text-xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
-                      disabled={isAdding}
-                    />
                   </div>
 
                   {/* Momento del día */}
                   <div>
-                    <label className="block text-lg sm:text-xl font-bold mb-1">Momento del día</label>
-                    <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                    <label className="block text-base sm:text-lg font-bold mb-0.5">Momento del día</label>
+                    <div className="grid grid-cols-4 gap-1.5">
                       {(["Desayuno", "Comida", "Cena", "Otro"] as const).map(type => (
                         <button 
                           type="button" 
                           key={type} 
                           onClick={() => setMealType(type)}
                           className={cn(
-                            "border-2 sm:border-4 border-[#0f380f] py-1.5 sm:py-2 text-base sm:text-lg font-bold transition-colors rounded", 
+                            "border-2 border-[#0f380f] py-1 text-base sm:text-lg font-bold transition-colors rounded", 
                             mealType === type ? "bg-[#0f380f] text-[#9bbc0f]" : "hover:bg-[#8bac0f]"
                           )}
                         >
@@ -811,42 +847,58 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
                       ))}
                     </div>
                   </div>
+                </div>
 
-                  {/* Botón de envío */}
+                {/* BOTÓN GUARDAR FIJO AL PIE (SIEMPRE VISIBLE) */}
+                <div className="pt-3 mt-1 border-t-2 border-[#0f380f]/30 shrink-0">
                   <button
                     type="submit"
                     disabled={isAdding || !newItem.trim()}
-                    className="w-full bg-[#0f380f] text-[#9bbc0f] text-xl sm:text-2xl font-black py-3 sm:py-3.5 border-4 border-[#0f380f] rounded-lg disabled:opacity-50 active:scale-95 transition-all mt-2"
+                    className="w-full bg-[#0f380f] text-[#9bbc0f] text-2xl font-black py-3 px-4 border-4 border-[#0f380f] rounded-xl disabled:opacity-50 active:scale-95 hover:bg-[#0f380f]/90 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
-                    {isAdding ? <Loader2 size={28} className="animate-spin mx-auto" /> : "GUARDAR COMIDA"}
+                    {isAdding ? (
+                      <>
+                        <Loader2 size={24} className="animate-spin" />
+                        <span>ANALIZANDO...</span>
+                      </>
+                    ) : (
+                      <span>GUARDAR COMIDA</span>
+                    )}
                   </button>
-                </form>
-              )}
+                </div>
+              </form>
+            )}
 
-              {modalTab === "peso" && (
-                <form onSubmit={handleSaveWeight} className="space-y-4">
+            {modalTab === "peso" && (
+              <form onSubmit={handleSaveWeight} className="flex flex-col flex-1 min-h-0">
+                <div className="overflow-y-auto pr-1 flex-1 space-y-3">
                   <div>
-                    <label className="block text-lg sm:text-xl font-bold mb-2">Peso actual (kg)</label>
+                    <label className="block text-lg font-bold mb-1">Peso actual (kg)</label>
                     <input
                       type="number"
                       step="0.1"
                       value={todayWeight}
                       onChange={(e) => setTodayWeight(e.target.value)}
                       placeholder="Ej: 75.5"
-                      className="w-full border-3 sm:border-4 border-[#0f380f] bg-transparent p-3 text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
+                      className="w-full border-3 border-[#0f380f] bg-transparent p-2.5 text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold rounded"
                       autoFocus
                     />
                   </div>
+                </div>
+
+                {/* BOTÓN GUARDAR PESO FIJO AL PIE */}
+                <div className="pt-3 mt-1 border-t-2 border-[#0f380f]/30 shrink-0">
                   <button
                     type="submit"
                     disabled={!todayWeight}
-                    className="w-full bg-[#0f380f] text-[#9bbc0f] text-xl sm:text-2xl font-black py-3 sm:py-3.5 border-4 border-[#0f380f] rounded-lg disabled:opacity-50 active:scale-95 transition-all"
+                    className="w-full bg-[#0f380f] text-[#9bbc0f] text-2xl font-black py-3 px-4 border-4 border-[#0f380f] rounded-xl disabled:opacity-50 active:scale-95 hover:bg-[#0f380f]/90 transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
                   >
                     GUARDAR PESO
                   </button>
-                </form>
-              )}
-            </div>
+                </div>
+              </form>
+            )}
+          </div>
 
           </div>
         </div>

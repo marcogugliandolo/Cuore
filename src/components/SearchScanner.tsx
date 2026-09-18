@@ -7,7 +7,6 @@ import { cn } from "../lib/utils";
 
 export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, "id" | "timestamp">) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
-  const [portion, setPortion] = useState("1 plato / ración");
   const [isSearching, setIsSearching] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [result, setResult] = useState<Omit<FoodEntry, "id" | "timestamp"> | null>(null);
@@ -16,23 +15,14 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const PORTION_PRESETS = [
-    "1 plato / ración",
-    "Media ración (poco)",
-    "Ración grande (abundante)",
-    "1 puñado (~30g)",
-    "1 vaso / taza",
-    "1 unidad / pieza",
-  ];
-
   const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
     setIsSearching(true);
     setErrorMessage(null);
     try {
-      const res = await classifyFood(searchTerm, portion.trim() || undefined);
-      setResult({ name: searchTerm.trim(), portion: portion.trim() || undefined, ...res });
+      const res = await classifyFood(searchTerm);
+      setResult({ name: searchTerm.trim(), ...res });
     } catch (err: any) {
       setErrorMessage(err?.message || "Error al analizar el alimento. Inténtalo de nuevo.");
     } finally {
@@ -47,12 +37,8 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
     setErrorMessage(null);
     try {
       const res = await scanLabel(file);
-      if (res.suggestedPortion) {
-        setPortion(res.suggestedPortion);
-      }
       setResult({ 
         name: res.name || "Producto escaneado", 
-        portion: res.suggestedPortion || portion,
         status: res.status, 
         reason: res.reason 
       });
@@ -77,13 +63,13 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
         </div>
       )}
 
-      <form onSubmit={handleSearch} className="space-y-3">
+      <form onSubmit={handleSearch} className="space-y-4">
         <div className="relative border-4 border-[#0f380f] bg-[#8bac0f] rounded-xl overflow-hidden">
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="EJ: NUECES, ARROZ, GALLETAS..."
+            placeholder="EJ: GALLETAS, NUECES, ARROZ..."
             className="w-full bg-transparent py-4 pl-4 pr-16 text-2xl focus:outline-none placeholder-[#0f380f]/50 font-bold uppercase"
             disabled={isSearching || isScanning}
           />
@@ -94,24 +80,6 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
           >
             {isSearching ? <Loader2 size={24} className="animate-spin" /> : <SearchIcon size={24} strokeWidth={3} />}
           </button>
-        </div>
-
-        {/* Proporción rápida antes de buscar */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-bold uppercase mr-1">Ración:</span>
-          {PORTION_PRESETS.slice(0, 4).map((p) => (
-            <button
-              type="button"
-              key={p}
-              onClick={() => setPortion(p)}
-              className={cn(
-                "border-2 border-[#0f380f] py-1 px-2 text-xs font-bold rounded transition-colors",
-                portion === p ? "bg-[#0f380f] text-[#9bbc0f]" : "bg-[#8bac0f]/50 hover:bg-[#8bac0f]"
-              )}
-            >
-              {p}
-            </button>
-          ))}
         </div>
       </form>
 
@@ -147,36 +115,6 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
           </div>
           
           <p className="text-xl font-bold leading-tight mb-6">{result.reason}</p>
-          
-          {/* Proporción / Ración en la tarjeta de resultado */}
-          <div className="mb-6 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xl font-black uppercase">Proporción:</p>
-              <span className="text-xs font-bold uppercase opacity-80">Ración consumida</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {PORTION_PRESETS.map((p) => (
-                <button
-                  type="button"
-                  key={p}
-                  onClick={() => setPortion(p)}
-                  className={cn(
-                    "border-2 border-[#0f380f] py-1 px-2 text-xs sm:text-sm font-bold rounded transition-colors truncate",
-                    portion === p ? "bg-[#0f380f] text-[#9bbc0f]" : "bg-[#9bbc0f]/60 hover:bg-[#9bbc0f]"
-                  )}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-            <input
-              type="text"
-              value={portion}
-              onChange={(e) => setPortion(e.target.value)}
-              placeholder="O escribe cantidad exacta..."
-              className="w-full border-2 border-[#0f380f] bg-[#9bbc0f]/40 p-2 text-lg font-bold focus:outline-none placeholder-[#0f380f]/50 rounded"
-            />
-          </div>
 
           <div className="mb-6 space-y-2">
             <p className="text-xl font-black uppercase">Momento:</p>
@@ -196,10 +134,9 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
           
           <button
             onClick={() => {
-              onAddEntry({ ...result, portion: portion.trim() || undefined, mealType });
+              onAddEntry({ ...result, mealType });
               setResult(null);
               setSearchTerm("");
-              setPortion("1 plato / ración");
             }}
             className="w-full bg-[#0f380f] text-[#9bbc0f] text-2xl font-black py-4 border-4 border-[#0f380f] rounded-xl active:bg-[#9bbc0f] active:text-[#0f380f] transition-colors"
           >
