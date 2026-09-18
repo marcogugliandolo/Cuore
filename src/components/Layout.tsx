@@ -27,21 +27,21 @@ export function Layout({ children, activeTab, setActiveTab, onLogout, currentUse
       <button
         key={tab.id}
         onClick={() => setActiveTab(tab.id)}
-        className="flex flex-col items-center gap-1 sm:gap-2 group flex-1 max-w-[90px] py-1 transition-transform active:scale-95"
+        className="flex flex-col items-center gap-1 group flex-1 max-w-[100px] md:max-w-[140px] py-1 transition-transform active:scale-95"
       >
         <div className={cn(
-          "w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-full border-2 sm:border-4 border-[#0f380f] sm:border-slate-900 flex items-center justify-center transition-all",
+          "w-11 h-11 md:w-14 md:h-14 2xl:w-16 2xl:h-16 rounded-xl 2xl:rounded-full border-2 md:border-3 2xl:border-[5px] border-[#0f380f] 2xl:border-slate-900 flex items-center justify-center transition-all",
           isActive 
-            ? "bg-[#0f380f] text-[#9bbc0f] sm:bg-yellow-400 sm:text-slate-900 translate-y-0.5 sm:translate-y-1 shadow-none" 
-            : "bg-[#9bbc0f] text-[#0f380f] sm:bg-blue-400 sm:text-slate-900 shadow-[0_2px_0_#0f380f] sm:shadow-[0_4px_0_#0f172a] group-hover:translate-y-0.5"
+            ? "bg-[#0f380f] text-[#9bbc0f] 2xl:bg-yellow-400 2xl:text-slate-900 translate-y-0.5 shadow-none" 
+            : "bg-[#9bbc0f] text-[#0f380f] 2xl:bg-blue-400 2xl:text-slate-900 shadow-[0_2px_0_#0f380f] 2xl:shadow-[0_6px_0_#0f172a] group-hover:translate-y-0.5"
         )}>
-          <tab.icon size={18} className="sm:w-5 sm:h-5" strokeWidth={3} />
+          <tab.icon size={20} className="md:w-6 md:h-6 2xl:w-7 2xl:h-7" strokeWidth={3} />
         </div>
         <span className={cn(
-          "text-xs sm:text-sm font-bold tracking-wider font-[VT323] uppercase transition-colors",
+          "text-xs md:text-sm 2xl:text-base font-bold tracking-wider font-[VT323] uppercase transition-colors",
           isActive 
-            ? "text-[#0f380f] font-black sm:text-white sm:drop-shadow-md" 
-            : "text-[#0f380f]/80 sm:text-white/90 sm:drop-shadow-md"
+            ? "text-[#0f380f] font-black 2xl:text-white 2xl:drop-shadow-md" 
+            : "text-[#0f380f]/80 2xl:text-white/90 2xl:drop-shadow-md"
         )}>
           {tab.label}
         </span>

@@ -240,7 +240,7 @@ export function Login({ onLogin }: LoginProps) {
           <h2 className="text-3xl font-black uppercase tracking-wider">CONÉCTATE</h2>
         </div>
         
-        <form onSubmit={handleLogin} className="w-full max-w-[270px] space-y-4">
+        <form onSubmit={handleLogin} className="w-full max-w-[270px] sm:max-w-xs md:max-w-sm space-y-4">
           <div className="space-y-1">
             <label className="block text-lg font-bold uppercase" htmlFor="username">
               Usuario

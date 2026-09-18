@@ -1,8 +1,8 @@
-import { useState, useRef, useEffect } from "react";
-import type { ChangeEvent } from "react";
+import { useState, useRef } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Upload, Loader2, Trash2, ChevronDown, ChevronUp, HardDrive, CheckCircle2, Download } from "lucide-react";
+import { Upload, Loader2, Trash2, ChevronDown, ChevronUp, HardDrive, CheckCircle2, Download, Plus, X } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { AnalyticsEntry, WeightEntry } from "../types";
 import { scanAnalytics } from "../api";
@@ -27,9 +27,38 @@ export function Progress({
   const [isUploading, setIsUploading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
   const [showWeightHistory, setShowWeightHistory] = useState(false);
+  const [showManualAnalytics, setShowManualAnalytics] = useState(false);
+  const [manualDate, setManualDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [manualTG, setManualTG] = useState("");
+  const [manualCol, setManualCol] = useState("");
+  const [manualNotes, setManualNotes] = useState("");
   const [isSavingServer, setIsSavingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleManualAnalyticsSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    const tg = parseFloat(manualTG);
+    if (isNaN(tg) || tg <= 0) {
+      setStatusMessage({ text: "Introduce un valor válido de triglicéridos.", isError: true });
+      return;
+    }
+    const col = manualCol ? parseFloat(manualCol) : 0;
+
+    onAddAnalytics({
+      date: manualDate || format(new Date(), "yyyy-MM-dd"),
+      triglycerides: tg,
+      cholesterol: isNaN(col) ? 0 : col,
+      notes: manualNotes.trim() || "Entrada manual",
+    });
+
+    setManualTG("");
+    setManualCol("");
+    setManualNotes("");
+    setShowManualAnalytics(false);
+    setStatusMessage({ text: "¡Analítica guardada correctamente!", isError: false });
+    setTimeout(() => setStatusMessage(null), 4000);
+  };
 
   // Comprobar estado de guardado en el servidor
   const verifyServerStorage = async () => {
@@ -140,12 +169,104 @@ export function Progress({
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             className="flex items-center justify-center w-10 h-10 bg-[#0f380f] text-[#9bbc0f] rounded-lg font-bold transition-colors disabled:opacity-50 ml-1"
-            title="Subir Analítica"
+            title="Escanear informe o analítica con IA"
           >
             {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} strokeWidth={3} />}
           </button>
+
+          {/* Botón Añadir Analítica Manualmente */}
+          <button
+            onClick={() => setShowManualAnalytics(!showManualAnalytics)}
+            className="flex items-center gap-1.5 px-3 py-2 border-2 border-[#0f380f] bg-[#0f380f] text-[#9bbc0f] hover:bg-[#8bac0f] hover:text-[#0f380f] text-xs font-bold uppercase rounded-lg transition-colors ml-1"
+            title="Añadir datos de analítica manualmente"
+          >
+            {showManualAnalytics ? <X size={16} /> : <Plus size={16} />}
+            <span>{showManualAnalytics ? "Cerrar" : "+ Analítica"}</span>
+          </button>
         </div>
       </header>
+
+      {/* Formulario desplegable para introducir analítica manualmente */}
+      {showManualAnalytics && (
+        <form 
+          onSubmit={handleManualAnalyticsSubmit}
+          className="p-4 bg-[#8bac0f] border-4 border-[#0f380f] rounded-xl space-y-3"
+        >
+          <div className="flex justify-between items-center border-b-2 border-[#0f380f] pb-2">
+            <h3 className="text-xl font-bold uppercase tracking-tight">NUEVA ANALÍTICA MANUAL</h3>
+            <button
+              type="button"
+              onClick={() => setShowManualAnalytics(false)}
+              className="p-1 hover:bg-[#0f380f] hover:text-[#9bbc0f] rounded"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Fecha</label>
+              <input
+                type="date"
+                value={manualDate}
+                onChange={(e) => setManualDate(e.target.value)}
+                required
+                className="w-full bg-[#9bbc0f] border-2 border-[#0f380f] p-2 rounded text-[#0f380f] font-bold text-sm outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Triglicéridos (mg/dL) *</label>
+              <input
+                type="number"
+                step="1"
+                placeholder="Ej: 231"
+                value={manualTG}
+                onChange={(e) => setManualTG(e.target.value)}
+                required
+                className="w-full bg-[#9bbc0f] border-2 border-[#0f380f] p-2 rounded text-[#0f380f] font-black text-lg outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase mb-1">Colesterol Total (mg/dL)</label>
+              <input
+                type="number"
+                step="1"
+                placeholder="Ej: 195 (opcional)"
+                value={manualCol}
+                onChange={(e) => setManualCol(e.target.value)}
+                className="w-full bg-[#9bbc0f] border-2 border-[#0f380f] p-2 rounded text-[#0f380f] font-bold text-lg outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold uppercase mb-1">Notas u Observaciones (opcional)</label>
+            <input
+              type="text"
+              placeholder="Ej: Análisis de sangre en ayunas - Centro de salud"
+              value={manualNotes}
+              onChange={(e) => setManualNotes(e.target.value)}
+              className="w-full bg-[#9bbc0f] border-2 border-[#0f380f] p-2 rounded text-[#0f380f] font-medium text-sm outline-none"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowManualAnalytics(false)}
+              className="px-3 py-1.5 border-2 border-[#0f380f] bg-transparent hover:bg-[#0f380f] hover:text-[#9bbc0f] text-xs font-bold uppercase rounded"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-1.5 border-2 border-[#0f380f] bg-[#0f380f] text-[#9bbc0f] hover:bg-[#9bbc0f] hover:text-[#0f380f] text-xs font-bold uppercase rounded shadow"
+            >
+              Guardar Analítica
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Notificación de estado del servidor/volumen */}
       {serverStatus && (
@@ -167,91 +288,94 @@ export function Progress({
         </div>
       )}
 
-      {/* Peso */}
-      <section className="bg-[#8bac0f] p-4 rounded-xl border-4 border-[#0f380f]">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-xl font-bold uppercase">PESO (kg)</h3>
-          {weightData.length > 0 && (
-            <button
-              onClick={() => setShowWeightHistory(!showWeightHistory)}
-              className="text-xs font-bold border-2 border-[#0f380f] px-2 py-1 rounded bg-[#9bbc0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors flex items-center gap-1"
-            >
-              <span>{showWeightHistory ? "Ocultar lista" : `Ver lista (${weightData.length})`}</span>
-              {showWeightHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-            </button>
-          )}
-        </div>
-
-        {weightData.length === 0 ? (
-          <p className="text-xl font-medium">SIN DATOS</p>
-        ) : (
-          <div className="h-64 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={weightChartData} margin={{ top: 10, right: 0, bottom: 0, left: -30 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#0f380f" opacity={0.3} />
-                <XAxis dataKey="displayDate" axisLine={{ stroke: '#0f380f', strokeWidth: 3 }} tickLine={{ stroke: '#0f380f', strokeWidth: 3 }} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} domain={['dataMin - 2', 'dataMax + 2']} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="step" dataKey="weight" stroke="#0f380f" strokeWidth={4} fillOpacity={0} />
-              </AreaChart>
-            </ResponsiveContainer>
+      {/* Gráficos de Peso y Analíticas en tablets */}
+      <div className="space-y-6 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 items-start">
+        {/* Peso */}
+        <section className="bg-[#8bac0f] p-4 md:p-5 rounded-xl border-4 border-[#0f380f] flex flex-col justify-between">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-xl md:text-2xl font-bold uppercase">PESO (kg)</h3>
+            {weightData.length > 0 && (
+              <button
+                onClick={() => setShowWeightHistory(!showWeightHistory)}
+                className="text-xs md:text-sm font-bold border-2 border-[#0f380f] px-2.5 py-1 rounded bg-[#9bbc0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors flex items-center gap-1"
+              >
+                <span>{showWeightHistory ? "Ocultar lista" : `Ver lista (${weightData.length})`}</span>
+                {showWeightHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            )}
           </div>
-        )}
 
-        {/* Historial de pesos con opción de eliminar */}
-        {showWeightHistory && weightData.length > 0 && (
-          <div className="mt-4 pt-4 border-t-2 border-[#0f380f] space-y-2">
-            <h4 className="font-bold text-lg uppercase mb-2">Registros de Peso</h4>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-              {weightData.slice().reverse().map(w => (
-                <WeightItem 
-                  key={w.id} 
-                  entry={w} 
-                  onDelete={() => onDeleteWeight?.(w.id)} 
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Analíticas */}
-      <section className="bg-[#8bac0f] p-4 rounded-xl border-4 border-[#0f380f]">
-        <h3 className="text-xl font-bold uppercase mb-4">TRIGLICÉRIDOS</h3>
-        {analyticsData.length === 0 ? (
-          <p className="text-xl font-medium">SUBE ANALÍTICA</p>
-        ) : (
-          <>
-            <div className="h-64 w-full mb-6">
+          {weightData.length === 0 ? (
+            <p className="text-xl font-medium py-12 text-center opacity-70">SIN DATOS DE PESO</p>
+          ) : (
+            <div className="h-64 md:h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={analyticsChartData} margin={{ top: 20, right: 0, bottom: 0, left: -20 }}>
+                <AreaChart data={weightChartData} margin={{ top: 10, right: 0, bottom: 0, left: -30 }}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#0f380f" opacity={0.3} />
                   <XAxis dataKey="displayDate" axisLine={{ stroke: '#0f380f', strokeWidth: 3 }} tickLine={{ stroke: '#0f380f', strokeWidth: 3 }} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} domain={['dataMin - 2', 'dataMax + 2']} />
                   <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine y={150} stroke="#0f380f" strokeDasharray="5 5" label={{ position: 'top', value: 'MAX 150', fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} />
-                  <Area type="stepAfter" dataKey="triglycerides" stroke="#0f380f" strokeWidth={4} fillOpacity={0} />
+                  <Area type="step" dataKey="weight" stroke="#0f380f" strokeWidth={4} fillOpacity={0} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between items-center border-b-2 border-[#0f380f] pb-2">
-                <h4 className="font-bold text-xl uppercase">INFORMES GUARDADOS</h4>
-                <span className="text-sm font-bold opacity-75">{analyticsData.length} informe{analyticsData.length === 1 ? "" : "s"}</span>
-              </div>
+          )}
 
-              {analyticsData.slice().reverse().map(a => (
-                <AnalyticsItem 
-                  key={a.id} 
-                  entry={a} 
-                  onDelete={() => onDeleteAnalytics?.(a.id)} 
-                />
-              ))}
+          {/* Historial de pesos con opción de eliminar */}
+          {showWeightHistory && weightData.length > 0 && (
+            <div className="mt-4 pt-4 border-t-2 border-[#0f380f] space-y-2">
+              <h4 className="font-bold text-lg uppercase mb-2">Registros de Peso</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {weightData.slice().reverse().map(w => (
+                  <WeightItem 
+                    key={w.id} 
+                    entry={w} 
+                    onDelete={() => onDeleteWeight?.(w.id)} 
+                  />
+                ))}
+              </div>
             </div>
-          </>
-        )}
-      </section>
+          )}
+        </section>
+
+        {/* Analíticas */}
+        <section className="bg-[#8bac0f] p-4 md:p-5 rounded-xl border-4 border-[#0f380f]">
+          <h3 className="text-xl md:text-2xl font-bold uppercase mb-4">TRIGLICÉRIDOS</h3>
+          {analyticsData.length === 0 ? (
+            <p className="text-xl font-medium py-12 text-center opacity-70">SUBE ANALÍTICA O AÑADE MANUAL</p>
+          ) : (
+            <>
+              <div className="h-64 md:h-72 w-full mb-6">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsChartData} margin={{ top: 20, right: 0, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#0f380f" opacity={0.3} />
+                    <XAxis dataKey="displayDate" axisLine={{ stroke: '#0f380f', strokeWidth: 3 }} tickLine={{ stroke: '#0f380f', strokeWidth: 3 }} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} dy={10} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} />
+                    <Tooltip content={<CustomTooltip />} />
+                    <ReferenceLine y={150} stroke="#0f380f" strokeDasharray="5 5" label={{ position: 'top', value: 'MAX 150', fill: '#0f380f', fontSize: 16, fontFamily: 'VT323', fontWeight: 'bold' }} />
+                    <Area type="stepAfter" dataKey="triglycerides" stroke="#0f380f" strokeWidth={4} fillOpacity={0} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="flex justify-between items-center border-b-2 border-[#0f380f] pb-2">
+                  <h4 className="font-bold text-xl uppercase">INFORMES GUARDADOS</h4>
+                  <span className="text-sm font-bold opacity-75">{analyticsData.length} informe{analyticsData.length === 1 ? "" : "s"}</span>
+                </div>
+
+                {analyticsData.slice().reverse().map(a => (
+                  <AnalyticsItem 
+                    key={a.id} 
+                    entry={a} 
+                    onDelete={() => onDeleteAnalytics?.(a.id)} 
+                  />
+                ))}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

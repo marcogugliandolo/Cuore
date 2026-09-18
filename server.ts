@@ -40,15 +40,26 @@ try {
   console.warn("[STORAGE] Error asegurando archivo/directorio de datos:", err);
 }
 
-// Initialize Gemini Client with User-Agent header for telemetry
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
-});
+// Initialize Gemini Client lazily with User-Agent header for telemetry and 60s timeout
+let geminiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+    throw new Error("GEMINI_API_KEY no está configurada en las variables de entorno del servidor. Por favor, configura GEMINI_API_KEY o introduce los datos manualmente.");
+  }
+  if (!geminiClient) {
+    geminiClient = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        timeout: 60000,
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return geminiClient;
+}
 
 const app = express();
 const PORT = 3000;
@@ -62,7 +73,42 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
 });
 
-// Helper for calling Gemini with model fallback and automatic retry on 503/429
+// Helper to inspect magic bytes and detect true MIME type
+function detectMimeType(buffer: Buffer, originalName = "", fallback = "image/jpeg"): string {
+  if (buffer && buffer.length > 4) {
+    // PDF: %PDF-
+    if (buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46) {
+      return "application/pdf";
+    }
+    // PNG: 89 50 4E 47
+    if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+      return "image/png";
+    }
+    // JPEG: FF D8 FF
+    if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+      return "image/jpeg";
+    }
+    // WebP: RIFF ... WEBP
+    if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+      return "image/webp";
+    }
+    // GIF: GIF8
+    if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) {
+      return "image/gif";
+    }
+  }
+
+  const ext = path.extname(originalName).toLowerCase();
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+
+  return fallback;
+}
+
+// Helper for calling Gemini with model fallback and automatic retry on 503/429/fetch failed
 async function callGeminiWithRetry(
   params: {
     contents: any;
@@ -70,13 +116,14 @@ async function callGeminiWithRetry(
   },
   taskName = "gemini-call"
 ): Promise<string> {
+  const client = getGeminiClient();
   const models = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
   let lastError: any = null;
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const response = await ai.models.generateContent({
+        const response = await client.models.generateContent({
           model,
           contents: params.contents,
           config: params.config,
@@ -87,24 +134,34 @@ async function callGeminiWithRetry(
         }
       } catch (err: any) {
         lastError = err;
+        const causeMsg = err?.cause?.message || err?.cause || "";
         console.warn(
           `[${taskName}] Attempt ${attempt + 1} with model '${model}' failed:`,
-          err?.message || err
+          err?.message || err,
+          causeMsg ? `(cause: ${causeMsg})` : ""
         );
 
         const status = err?.status || err?.code || (err?.error && err?.error?.code);
-        const errMsg = `${err?.message || err}`;
+        const errMsg = `${err?.message || err} ${causeMsg}`.toLowerCase();
         const isTemporaryError =
           status === 503 ||
           status === 429 ||
           errMsg.includes("503") ||
+          errMsg.includes("429") ||
+          errMsg.includes("fetch failed") ||
+          errMsg.includes("network") ||
+          errMsg.includes("timeout") ||
+          errMsg.includes("socket") ||
+          errMsg.includes("econnreset") ||
+          errMsg.includes("etimedout") ||
+          errMsg.includes("und_err") ||
           errMsg.includes("high demand") ||
-          errMsg.includes("UNAVAILABLE") ||
-          errMsg.includes("RESOURCE_EXHAUSTED");
+          errMsg.includes("unavailable") ||
+          errMsg.includes("resource_exhausted");
 
         if (isTemporaryError && attempt === 0) {
-          // Wait briefly before retrying this model
-          await new Promise((resolve) => setTimeout(resolve, 800));
+          // Wait with backoff before retrying this model
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         } else {
           // Move to next fallback model
           break;
@@ -204,13 +261,15 @@ app.post("/api/scan", upload.single("image"), async (req, res) => {
       return res.status(400).json({ error: "No se ha proporcionado ninguna imagen" });
     }
 
+    const mimeType = detectMimeType(req.file.buffer, req.file.originalname, req.file.mimetype || "image/jpeg");
+
     const rawText = await callGeminiWithRetry(
       {
         contents: [
           {
             inlineData: {
               data: req.file.buffer.toString("base64"),
-              mimeType: req.file.mimetype || "image/jpeg",
+              mimeType,
             },
           },
           `${classificationPrompt}\nAnaliza los ingredientes y tabla nutricional de este producto desde la imagen.`,
@@ -227,8 +286,14 @@ app.post("/api/scan", upload.single("image"), async (req, res) => {
     res.json(parsed);
   } catch (error: any) {
     console.error("Error scanning label:", error);
+    const msg = `${error?.message || error}`;
+    if (msg.includes("GEMINI_API_KEY")) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY no configurada en el servidor. Puedes registrar el alimento manualmente por su nombre.",
+      });
+    }
     res.status(503).json({
-      error: "El servicio de escaneo está saturado momentáneamente. Por favor, reintenta en unos segundos.",
+      error: "El servicio de escaneo no pudo procesar la imagen en este momento. Por favor, reintenta o escribe el nombre del alimento.",
     });
   }
 });
@@ -239,6 +304,8 @@ app.post("/api/analytics", upload.single("image"), async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ error: "No se ha proporcionado ninguna imagen" });
     }
+
+    const mimeType = detectMimeType(req.file.buffer, req.file.originalname, req.file.mimetype || "image/jpeg");
 
     const prompt = `
       Analiza esta analítica de sangre (blood test). Extrae los valores de Triglicéridos y Colesterol Total.
@@ -256,7 +323,7 @@ app.post("/api/analytics", upload.single("image"), async (req, res) => {
           {
             inlineData: {
               data: req.file.buffer.toString("base64"),
-              mimeType: req.file.mimetype || "image/jpeg",
+              mimeType,
             },
           },
           prompt,
@@ -273,8 +340,14 @@ app.post("/api/analytics", upload.single("image"), async (req, res) => {
     res.json(parsed);
   } catch (error: any) {
     console.error("Error analyzing blood test:", error);
+    const msg = `${error?.message || error}`;
+    if (msg.includes("GEMINI_API_KEY")) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY no configurada en el servidor. Puedes añadir tu analítica manualmente con el botón '+ Analítica'.",
+      });
+    }
     res.status(503).json({
-      error: "El servicio de análisis médico está saturado momentáneamente. Por favor, reintenta en unos segundos.",
+      error: "Error temporal de conexión al leer la analítica. Por favor, reintenta o introduce los valores con el botón '+ Analítica'.",
     });
   }
 });

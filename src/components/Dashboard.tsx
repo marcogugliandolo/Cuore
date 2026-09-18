@@ -173,18 +173,18 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       </div>
 
       {/* STATS */}
-      <section className="space-y-4">
+      <section className="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 items-stretch">
         {/* TARJETA TRIGLICÉRIDOS */}
-        <div className="border-4 border-[#0f380f] p-3.5 rounded-xl bg-[#8bac0f]/40 space-y-3">
+        <div className="border-4 border-[#0f380f] p-3.5 md:p-4 rounded-xl bg-[#8bac0f]/40 space-y-3 flex flex-col justify-between">
           {/* Fila superior: Título y Fecha */}
           <div className="flex items-center justify-between border-b-2 border-[#0f380f]/20 pb-1.5">
-            <span className="text-base font-bold uppercase tracking-wider">Triglicéridos</span>
+            <span className="text-base md:text-lg font-bold uppercase tracking-wider">Triglicéridos</span>
             {latestAnalytics ? (
-              <span className="text-xs font-bold opacity-80">
+              <span className="text-xs md:text-sm font-bold opacity-80">
                 Última analítica: {latestAnalytics.date}
               </span>
             ) : (
-              <span className="text-xs font-bold opacity-60">Sin analítica</span>
+              <span className="text-xs md:text-sm font-bold opacity-60">Sin analítica</span>
             )}
           </div>
 
@@ -296,62 +296,64 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
         </div>
 
         {/* TARJETA PESO */}
-        <div className="border-4 border-[#0f380f] p-3.5 rounded-xl bg-[#8bac0f]/40 space-y-2">
-          <div className="flex items-center justify-between border-b-2 border-[#0f380f]/20 pb-1.5">
-            <span className="text-base font-bold uppercase tracking-wider">Peso de Hoy</span>
-            {todayWeightEntry && onDeleteWeight && (
-              confirmWeightDelete ? (
-                <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-2 py-0.5 rounded text-xs">
-                  <span>¿Borrar?</span>
+        <div className="border-4 border-[#0f380f] p-3.5 md:p-4 rounded-xl bg-[#8bac0f]/40 space-y-2 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between border-b-2 border-[#0f380f]/20 pb-1.5">
+              <span className="text-base md:text-lg font-bold uppercase tracking-wider">Peso de Hoy</span>
+              {todayWeightEntry && onDeleteWeight && (
+                confirmWeightDelete ? (
+                  <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-2 py-0.5 rounded text-xs">
+                    <span>¿Borrar?</span>
+                    <button
+                      onClick={() => {
+                        onDeleteWeight(todayWeightEntry.id);
+                        setConfirmWeightDelete(false);
+                      }}
+                      className="font-black text-[#9bbc0f] underline ml-1"
+                    >
+                      SÍ
+                    </button>
+                    <span>/</span>
+                    <button
+                      onClick={() => setConfirmWeightDelete(false)}
+                      className="font-bold text-[#9bbc0f] hover:underline"
+                    >
+                      NO
+                    </button>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => {
-                      onDeleteWeight(todayWeightEntry.id);
-                      setConfirmWeightDelete(false);
-                    }}
-                    className="font-black text-[#9bbc0f] underline ml-1"
+                    onClick={() => setConfirmWeightDelete(true)}
+                    className="border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                    title="Eliminar registro de peso de hoy"
                   >
-                    SÍ
+                    <Trash2 size={11} /> BORRAR
                   </button>
-                  <span>/</span>
-                  <button
-                    onClick={() => setConfirmWeightDelete(false)}
-                    className="font-bold text-[#9bbc0f] hover:underline"
-                  >
-                    NO
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmWeightDelete(true)}
-                  className="border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] px-2 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
-                  title="Eliminar registro de peso de hoy"
-                >
-                  <Trash2 size={11} /> BORRAR
-                </button>
-              )
-            )}
-          </div>
-
-          <div className="flex items-baseline justify-between pt-1">
-            <div>
-              <span className="text-3xl font-black">
-                {todayWeightEntry?.weight ? `${todayWeightEntry.weight} kg` : "--- kg"}
-              </span>
-              <p className="text-[11px] font-bold uppercase tracking-tight opacity-75 mt-0.5">
-                {todayWeightEntry ? "Registrado hoy" : "Sin registrar hoy"}
-              </p>
+                )
+              )}
             </div>
-            {!todayWeightEntry && (
-              <button
-                onClick={() => {
-                  setModalTab("peso");
-                  setIsModalOpen(true);
-                }}
-                className="text-xs font-bold uppercase px-2 py-1 border-2 border-[#0f380f] rounded hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
-              >
-                + Añadir Peso
-              </button>
-            )}
+
+            <div className="flex items-baseline justify-between pt-2">
+              <div>
+                <span className="text-3xl md:text-4xl font-black">
+                  {todayWeightEntry?.weight ? `${todayWeightEntry.weight} kg` : "--- kg"}
+                </span>
+                <p className="text-[11px] md:text-xs font-bold uppercase tracking-tight opacity-75 mt-0.5">
+                  {todayWeightEntry ? "Registrado hoy" : "Sin registrar hoy"}
+                </p>
+              </div>
+              {!todayWeightEntry && (
+                <button
+                  onClick={() => {
+                    setModalTab("peso");
+                    setIsModalOpen(true);
+                  }}
+                  className="text-xs md:text-sm font-bold uppercase px-2.5 py-1.5 border-2 border-[#0f380f] rounded hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+                >
+                  + Añadir Peso
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -410,8 +412,8 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
 
       {/* MODAL (POPUP) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#9bbc0f] border-8 border-[#0f380f] rounded-2xl p-6 shadow-2xl relative font-[VT323] text-[#0f380f]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-6 bg-black/50 backdrop-blur-sm">
+          <div className="w-full max-w-md md:max-w-lg bg-[#9bbc0f] border-8 border-[#0f380f] rounded-2xl p-6 md:p-8 shadow-2xl relative font-[VT323] text-[#0f380f]">
             
             <button 
               onClick={() => setIsModalOpen(false)}

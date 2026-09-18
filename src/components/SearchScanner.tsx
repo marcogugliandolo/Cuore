@@ -114,7 +114,7 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
           
           <div className="mb-6 space-y-2">
             <p className="text-xl font-black uppercase">Momento:</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {(["Desayuno", "Comida", "Cena", "Otro"] as const).map(type => (
                 <button 
                   type="button" 
