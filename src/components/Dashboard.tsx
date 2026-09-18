@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, Trash2, ChevronDown, ChevronUp, TrendingDown, TrendingUp, Minus, Sparkles, Info } from "lucide-react";
 import { FoodEntry, AnalyticsEntry, WeightEntry } from "../types";
 import { classifyFood } from "../api";
 import { cn } from "../lib/utils";
@@ -78,6 +78,49 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
     Evitar: "( > _ < )"
   };
 
+  // Estimación predictiva de triglicéridos basada en:
+  // 1) Valor de la última analítica real (base médica)
+  // 2) Calidad de comidas registradas (alimentos "Bueno" reducen/mantienen; alimentos "Evitar" aumentan)
+  // 3) Evolución del peso (bajar de peso reduce fuertemente triglicéridos)
+  const calculateTriglyceridesEstimate = () => {
+    if (!latestAnalytics?.triglycerides) return null;
+    const baseTrig = latestAnalytics.triglycerides;
+    
+    // Comidas registradas
+    const goodMeals = entries.filter(e => e.status === "Bueno").length;
+    const avoidMeals = entries.filter(e => e.status === "Evitar").length;
+    const foodDelta = (avoidMeals * 4) - (goodMeals * 2.5);
+
+    // Delta de peso si hay historial
+    let weightDelta = 0;
+    if (weightData.length >= 2) {
+      const firstWeight = weightData[0].weight;
+      const lastWeight = weightData[weightData.length - 1].weight;
+      const diff = lastWeight - firstWeight;
+      // 1kg de bajada suele reducir ~6-8 mg/dL triglicéridos
+      weightDelta = diff * 7;
+    }
+
+    const estimated = Math.max(50, Math.round(baseTrig + foodDelta + weightDelta));
+    const difference = estimated - baseTrig;
+
+    let trend: "improving" | "worsening" | "stable" = "stable";
+    if (difference <= -3) trend = "improving";
+    else if (difference >= 3) trend = "worsening";
+
+    return {
+      base: baseTrig,
+      date: latestAnalytics.date,
+      estimated,
+      difference,
+      trend,
+      goodMeals,
+      avoidMeals,
+    };
+  };
+
+  const trigEstimate = calculateTriglyceridesEstimate();
+
   return (
     <div className="space-y-6">
       
@@ -98,14 +141,87 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       </div>
 
       {/* STATS */}
-      <section className="grid grid-cols-2 gap-4">
-        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-center">
-          <p className="text-sm font-bold uppercase">Triglicéridos</p>
-          <p className="text-3xl font-black mt-2">
-            {latestAnalytics?.triglycerides || "---"}
-          </p>
+      <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* TRIGLICÉRIDOS: ANALÍTICA REAL + ESTIMACIÓN SEGÚN COMIDA Y PESO */}
+        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between bg-[#8bac0f]/40">
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-bold uppercase tracking-wide">Triglicéridos</span>
+              {latestAnalytics && (
+                <span className="text-[11px] font-bold opacity-75">
+                  Analítica: {latestAnalytics.date}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-baseline gap-3 mt-1">
+              <div>
+                <p className="text-3xl font-black leading-none">
+                  {latestAnalytics?.triglycerides ? `${latestAnalytics.triglycerides}` : "---"}
+                </p>
+                <p className="text-[10px] font-bold uppercase opacity-75 mt-0.5">Última Analítica</p>
+              </div>
+
+              {trigEstimate && (
+                <div className="border-l-2 border-[#0f380f]/40 pl-3">
+                  <div className="flex items-center gap-1">
+                    <p className="text-2xl font-black leading-none">
+                      ~{trigEstimate.estimated}
+                    </p>
+                    {trigEstimate.trend === "improving" && (
+                      <span className="text-xs font-black px-1 rounded bg-[#0f380f] text-[#9bbc0f] flex items-center">
+                        <TrendingDown size={12} className="mr-0.5" />
+                        {trigEstimate.difference}
+                      </span>
+                    )}
+                    {trigEstimate.trend === "worsening" && (
+                      <span className="text-xs font-black px-1 rounded bg-[#0f380f] text-[#9bbc0f] flex items-center">
+                        <TrendingUp size={12} className="mr-0.5" />
+                        +{trigEstimate.difference}
+                      </span>
+                    )}
+                    {trigEstimate.trend === "stable" && (
+                      <span className="text-xs font-bold px-1 rounded border border-[#0f380f]">
+                        ESTABLE
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold uppercase opacity-75 mt-0.5">Estimado Actual</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Feedback explicativo de evolución */}
+          <div className="mt-3 pt-2 border-t-2 border-[#0f380f]/30">
+            {trigEstimate ? (
+              <p className="text-xs font-bold leading-tight">
+                {trigEstimate.trend === "improving" && (
+                  <span className="text-[#0f380f]">
+                    ✓ ¡Mejorando! Tus comidas saludables y peso están reduciendo la carga.
+                  </span>
+                )}
+                {trigEstimate.trend === "worsening" && (
+                  <span className="text-[#0f380f]">
+                    ▲ Cuidado: alimentos a evitar o peso están subiendo el estimado.
+                  </span>
+                )}
+                {trigEstimate.trend === "stable" && (
+                  <span className="text-[#0f380f] opacity-90">
+                    • En rango estable según tus registros recientes.
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="text-[11px] font-bold opacity-75 leading-tight">
+                Sube una analítica en Informes para activar la predicción inteligente.
+              </p>
+            )}
+          </div>
         </div>
-        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between relative">
+
+        {/* PESO */}
+        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between relative bg-[#8bac0f]/40">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold uppercase">Peso</p>
             {todayWeightEntry && onDeleteWeight && (

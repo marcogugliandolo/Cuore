@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Gradiente de la carcasa retro tipo huevo / Tamagotchi -->
+    <linearGradient id="eggGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb7185" />
+      <stop offset="45%" stop-color="#f43f5e" />
+      <stop offset="100%" stop-color="#be123c" />
+    </linearGradient>
+
+    <!-- Brillo curvo superior de la carcasa -->
+    <linearGradient id="shineGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.45" />
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
+    </linearGradient>
+
+    <!-- Pantalla LCD GameBoy verdosa -->
+    <linearGradient id="lcdGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#9bbc0f" />
+      <stop offset="100%" stop-color="#8bac0f" />
+    </linearGradient>
+
+    <filter id="dropShadow" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0f172a" flood-opacity="0.35" />
+    </filter>
+  </defs>
+
+  <!-- Carcasa exterior Tamagotchi con forma ovalada suave -->
+  <g filter="url(#dropShadow)">
+    <ellipse cx="32" cy="33" rx="28" ry="30" fill="#0f172a" />
+    <ellipse cx="32" cy="32" rx="27" ry="29" fill="url(#eggGrad)" />
+    
+    <!-- Relieve 3D biselado interior -->
+    <ellipse cx="32" cy="31.5" rx="25.5" ry="27.5" fill="none" stroke="#fda4af" stroke-width="1.5" opacity="0.6" />
+    
+    <!-- Reflejo de luz en la carcasa -->
+    <path d="M 12 24 C 14 12, 24 6, 36 6 C 24 7, 15 15, 12 24 Z" fill="url(#shineGrad)" />
+  </g>
+
+  <!-- Marco de la pantallita LCD cuadrada-redondeada -->
+  <rect x="15" y="13" width="34" height="27" rx="5" fill="#0f172a" />
+  <rect x="16.5" y="14.5" width="31" height="24" rx="4" fill="url(#lcdGrad)" stroke="#306230" stroke-width="0.5" />
+
+  <!-- Sombra interna sutil de la pantalla LCD -->
+  <rect x="17" y="15" width="30" height="2" fill="#306230" opacity="0.25" />
+
+  <!-- Pixel Art Heartbeat en la pantalla LCD (Verde GameBoy clásico #0f380f) -->
+  <!-- Corazón pixelado perfecto y nítido -->
+  <g fill="#0f380f" shape-rendering="crispEdges">
+    <!-- Fila 1 (Cúpulas del corazón) -->
+    <rect x="23" y="19" width="4" height="2" />
+    <rect x="37" y="19" width="4" height="2" />
+    
+    <!-- Fila 2 -->
+    <rect x="21" y="21" width="8" height="2" />
+    <rect x="35" y="21" width="8" height="2" />
+    
+    <!-- Fila 3 -->
+    <rect x="19" y="23" width="26" height="2" />
+    
+    <!-- Fila 4 -->
+    <rect x="19" y="25" width="26" height="2" />
+    
+    <!-- Fila 5 -->
+    <rect x="21" y="27" width="22" height="2" />
+    
+    <!-- Fila 6 -->
+    <rect x="23" y="29" width="18" height="2" />
+    
+    <!-- Fila 7 -->
+    <rect x="25" y="31" width="14" height="2" />
+    
+    <!-- Fila 8 -->
+    <rect x="28" y="33" width="8" height="2" />
+    
+    <!-- Fila 9 (Punta) -->
+    <rect x="30" y="35" width="4" height="2" />
+
+    <!-- Brillo pixel blanco/LCD en el corazón -->
+    <rect x="23" y="21" width="2" height="2" fill="#9bbc0f" />
+  </g>
+
+  <!-- 3 Botoncitos físicos retro en arco inferior -->
+  <!-- Botón Izquierdo A -->
+  <circle cx="21" cy="48" r="4.2" fill="#0f172a" />
+  <circle cx="21" cy="47.2" r="3.6" fill="#fbcfe8" />
+  <circle cx="21" cy="46.8" r="3.2" fill="#f43f5e" />
+
+  <!-- Botón Central B (ligeramente más bajo) -->
+  <circle cx="32" cy="51" r="4.2" fill="#0f172a" />
+  <circle cx="32" cy="50.2" r="3.6" fill="#fde047" />
+  <circle cx="32" cy="49.8" r="3.2" fill="#eab308" />
+
+  <!-- Botón Derecho C -->
+  <circle cx="43" cy="48" r="4.2" fill="#0f172a" />
+  <circle cx="43" cy="47.2" r="3.6" fill="#67e8f9" />
+  <circle cx="43" cy="46.8" r="3.2" fill="#06b6d4" />
+</svg>
