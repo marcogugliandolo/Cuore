@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { TamagotchiShell } from "./TamagotchiShell";
-import { Eye, EyeOff } from "lucide-react";
 
 // Frame 0: Relaxed / diastolic heart state
 const leftA = [
@@ -175,7 +174,6 @@ interface LoginProps {
 export function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [frame, setFrame] = useState(0);
 
@@ -209,14 +207,16 @@ export function Login({ onLogin }: LoginProps) {
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
     const cleanUser = username.trim().toLowerCase();
-    const cleanPass = password.trim();
+    const cleanPass = password.trim().toLowerCase();
 
-    // Acepta tanto "modosano2026" como "mundosano2026" (por variaciones tipográficas habituales), insensible a mayúsculas
-    const validPass = ["modosano2026", "mundosano2026", "marco", "1234"];
-    if (
-      (cleanUser === "marco" || cleanUser === "admin" || cleanUser === "cuore") &&
-      validPass.includes(cleanPass)
-    ) {
+    // Credenciales autorizadas
+    const isMarco = (cleanUser === "marco" || cleanUser === "admin" || cleanUser === "cuore") &&
+      ["modosano2026", "mundosano2026", "marco", "1234"].includes(cleanPass);
+
+    const isClaudia = cleanUser === "claudia" &&
+      ["bombon2026", "bombón2026", "claudia"].includes(cleanPass);
+
+    if (isMarco || isClaudia) {
       onLogin();
     } else {
       setError("X ERROR DE ACCESO X");
@@ -261,36 +261,24 @@ export function Login({ onLogin }: LoginProps) {
           </div>
           
           <div className="space-y-1">
-            <div className="flex justify-between items-center">
-              <label className="block text-lg font-bold uppercase" htmlFor="password">
-                Código / Clave
-              </label>
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="text-xs font-bold flex items-center gap-1 border border-[#0f380f] px-1.5 py-0.5 rounded bg-[#8bac0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
-              >
-                {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
-                <span>{showPassword ? "OCULTAR" : "VER"}</span>
-              </button>
-            </div>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoComplete="current-password"
-                className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold font-mono tracking-wider"
-                placeholder=""
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (error) setError("");
-                }}
-              />
-            </div>
+            <label className="block text-lg font-bold uppercase" htmlFor="password">
+              Código / Clave
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="current-password"
+              className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold font-mono tracking-wider"
+              placeholder=""
+              value={password}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError("");
+              }}
+            />
           </div>
 
           {error && (
