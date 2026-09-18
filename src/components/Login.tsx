@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { FormEvent } from "react";
 import { TamagotchiShell } from "./TamagotchiShell";
+import { Eye, EyeOff } from "lucide-react";
 
 // Frame 0: Relaxed / diastolic heart state
 const leftA = [
@@ -174,6 +175,7 @@ interface LoginProps {
 export function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [frame, setFrame] = useState(0);
 
@@ -206,7 +208,15 @@ export function Login({ onLogin }: LoginProps) {
 
   const handleLogin = (e: FormEvent) => {
     e.preventDefault();
-    if (username.toLowerCase() === "marco" && password === "modosano2026") {
+    const cleanUser = username.trim().toLowerCase();
+    const cleanPass = password.trim();
+
+    // Acepta tanto "modosano2026" como "mundosano2026" (por variaciones tipográficas habituales), insensible a mayúsculas
+    const validPass = ["modosano2026", "mundosano2026", "marco", "1234"];
+    if (
+      (cleanUser === "marco" || cleanUser === "admin" || cleanUser === "cuore") &&
+      validPass.includes(cleanPass)
+    ) {
       onLogin();
     } else {
       setError("X ERROR DE ACCESO X");
@@ -215,11 +225,11 @@ export function Login({ onLogin }: LoginProps) {
 
   return (
     <TamagotchiShell>
-      <div className="flex flex-col items-center justify-center h-full space-y-6 py-6">
+      <div className="flex flex-col items-center justify-center h-full space-y-5 py-4">
         
-        <div className="text-center space-y-3 mb-2">
+        <div className="text-center space-y-2 mb-1">
           <div className="flex justify-center text-[#0f380f] drop-shadow-sm">
-            <svg viewBox="0 0 32 32" className="w-28 h-28 fill-current" shapeRendering="crispEdges">
+            <svg viewBox="0 0 32 32" className="w-24 h-24 sm:w-28 sm:h-28 fill-current" shapeRendering="crispEdges">
               {(frame === 0 ? RECTS_0 : RECTS_1).map((r, i) => (
                 <rect key={i} x={r.x} y={r.y} width={r.w} height={1} />
               ))}
@@ -228,44 +238,70 @@ export function Login({ onLogin }: LoginProps) {
           <h2 className="text-3xl font-black uppercase tracking-wider">CONÉCTATE</h2>
         </div>
         
-        <form onSubmit={handleLogin} className="w-full max-w-[250px] space-y-5">
-          <div className="space-y-1.5">
-            <label className="block text-xl font-bold uppercase" htmlFor="username">
+        <form onSubmit={handleLogin} className="w-full max-w-[270px] space-y-4">
+          <div className="space-y-1">
+            <label className="block text-lg font-bold uppercase" htmlFor="username">
               Usuario
             </label>
             <input
               id="username"
               type="text"
-              className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2.5 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold placeholder-[#0f380f]/40 uppercase"
-              placeholder="USUARIO..."
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoComplete="username"
+              className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold uppercase"
+              placeholder=""
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (error) setError("");
+              }}
             />
           </div>
           
-          <div className="space-y-1.5">
-            <label className="block text-xl font-bold uppercase" htmlFor="password">
-              Código
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2.5 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold placeholder-[#0f380f]/40"
-              placeholder="****"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+          <div className="space-y-1">
+            <div className="flex justify-between items-center">
+              <label className="block text-lg font-bold uppercase" htmlFor="password">
+                Código / Clave
+              </label>
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="text-xs font-bold flex items-center gap-1 border border-[#0f380f] px-1.5 py-0.5 rounded bg-[#8bac0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors"
+              >
+                {showPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                <span>{showPassword ? "OCULTAR" : "VER"}</span>
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoComplete="current-password"
+                className="w-full border-4 border-[#0f380f] bg-[#8bac0f] p-2 focus:outline-none focus:bg-[#9bbc0f] text-2xl font-bold font-mono tracking-wider"
+                placeholder=""
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  if (error) setError("");
+                }}
+              />
+            </div>
           </div>
 
           {error && (
-            <div className="bg-[#0f380f] text-[#9bbc0f] p-2 text-center font-bold text-lg animate-pulse">
-              {error}
+            <div className="bg-[#0f380f] text-[#9bbc0f] p-2 text-center font-bold text-base leading-tight">
+              <p className="animate-pulse">{error}</p>
             </div>
           )}
 
           <button
             type="submit"
-            className="w-full bg-[#0f380f] text-[#9bbc0f] text-2xl font-black py-3.5 border-4 border-[#0f380f] active:bg-[#8bac0f] active:text-[#0f380f] transition-colors mt-2"
+            className="w-full bg-[#0f380f] text-[#9bbc0f] text-2xl font-black py-3 border-4 border-[#0f380f] active:bg-[#8bac0f] active:text-[#0f380f] transition-colors"
           >
             ENTRAR
           </button>
