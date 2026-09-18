@@ -1,0 +1,6 @@
+{
+  "name": "Modo Sano",
+  "description": "Aplicación minimalista para el control y reducción de triglicéridos altos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
