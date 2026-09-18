@@ -11,9 +11,10 @@ interface LayoutProps {
   setActiveTab: (tab: "dashboard" | "search" | "progress") => void;
   onLogout: () => void;
   entries?: FoodEntry[];
+  currentUser?: string;
 }
 
-export function Layout({ children, activeTab, setActiveTab, onLogout }: LayoutProps) {
+export function Layout({ children, activeTab, setActiveTab, onLogout, currentUser }: LayoutProps) {
   const tabs = [
     { id: "dashboard" as const, label: "HOY", icon: Home },
     { id: "search" as const, label: "BUSCAR", icon: ScanBarcode },
@@ -49,7 +50,7 @@ export function Layout({ children, activeTab, setActiveTab, onLogout }: LayoutPr
   });
 
   return (
-    <TamagotchiShell onLogout={onLogout} showButtons={true} buttons={buttons}>
+    <TamagotchiShell onLogout={onLogout} showButtons={true} buttons={buttons} currentUser={currentUser}>
       <AnimatePresence mode="wait">
         <motion.div
           key={activeTab}

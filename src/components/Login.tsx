@@ -168,7 +168,7 @@ const RECTS_0 = gridToRects(FRAME_0);
 const RECTS_1 = gridToRects(FRAME_1);
 
 interface LoginProps {
-  onLogin: () => void;
+  onLogin: (user: string) => void;
 }
 
 export function Login({ onLogin }: LoginProps) {
@@ -216,8 +216,10 @@ export function Login({ onLogin }: LoginProps) {
     const isClaudia = cleanUser === "claudia" &&
       ["bombon2026", "bombón2026", "claudia"].includes(cleanPass);
 
-    if (isMarco || isClaudia) {
-      onLogin();
+    if (isMarco) {
+      onLogin("Marco");
+    } else if (isClaudia) {
+      onLogin("Claudia");
     } else {
       setError("X ERROR DE ACCESO X");
     }

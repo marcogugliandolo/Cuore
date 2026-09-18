@@ -10,6 +10,9 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem("modo_sano_auth") === "true";
   });
+  const [currentUser, setCurrentUser] = useState<string>(() => {
+    return localStorage.getItem("cuore_user") || "Marco";
+  });
   const [activeTab, setActiveTab] = useState<"dashboard" | "search" | "progress">("dashboard");
 
   const [entries, setEntries] = useState<FoodEntry[]>(() => {
@@ -39,8 +42,10 @@ export default function App() {
     localStorage.setItem("cuore_weight", JSON.stringify(weightData));
   }, [weightData]);
 
-  const handleLogin = () => {
+  const handleLogin = (user: string) => {
     localStorage.setItem("modo_sano_auth", "true");
+    localStorage.setItem("cuore_user", user);
+    setCurrentUser(user);
     setIsAuthenticated(true);
   };
 
@@ -89,7 +94,7 @@ export default function App() {
   }
 
   return (
-    <Layout activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} entries={entries}>
+    <Layout activeTab={activeTab} setActiveTab={setActiveTab} onLogout={handleLogout} entries={entries} currentUser={currentUser}>
       {activeTab === "dashboard" && (
         <Dashboard 
           entries={entries} 
@@ -99,6 +104,7 @@ export default function App() {
           weightData={weightData} 
           onAddWeight={addWeight}
           onDeleteWeight={deleteWeight}
+          currentUser={currentUser}
         />
       )}
       {activeTab === "search" && <SearchScanner onAddEntry={addEntry} />}

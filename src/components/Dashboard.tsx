@@ -15,9 +15,10 @@ interface DashboardProps {
   weightData: WeightEntry[];
   onAddWeight: (entry: Omit<WeightEntry, "id">) => void;
   onDeleteWeight?: (id: string) => void;
+  currentUser?: string;
 }
 
-export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, weightData, onAddWeight, onDeleteWeight }: DashboardProps) {
+export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, weightData, onAddWeight, onDeleteWeight, currentUser = "Marco" }: DashboardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"comida" | "peso">("comida");
   
@@ -82,7 +83,7 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
       
       {/* HEADER */}
       <header className="border-b-4 border-[#0f380f] pb-4">
-        <h1 className="text-4xl font-bold tracking-tight uppercase">HOLA MARCO</h1>
+        <h1 className="text-4xl font-bold tracking-tight uppercase">HOLA {currentUser}</h1>
         <p className="text-xl font-bold">
           {format(new Date(), "dd/MM/yyyy")}
         </p>
