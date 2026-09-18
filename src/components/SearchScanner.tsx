@@ -1,8 +1,9 @@
 import { useState, useRef } from "react";
+import type { FormEvent, ChangeEvent } from "react";
 import { Search as SearchIcon, Camera, Loader2 } from "lucide-react";
 import { FoodEntry } from "../types";
 import { classifyFood, scanLabel } from "../api";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, "id" | "timestamp">) => void }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -10,32 +11,35 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
   const [isScanning, setIsScanning] = useState(false);
   const [result, setResult] = useState<Omit<FoodEntry, "id" | "timestamp"> | null>(null);
   const [mealType, setMealType] = useState<"Desayuno" | "Comida" | "Cena" | "Otro">("Comida");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  const handleSearch = async (e: FormEvent) => {
     e.preventDefault();
     if (!searchTerm.trim()) return;
     setIsSearching(true);
+    setErrorMessage(null);
     try {
       const res = await classifyFood(searchTerm);
       setResult({ name: searchTerm.trim(), ...res });
-    } catch {
-      alert("Error al analizar el alimento.");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Error al analizar el alimento. Inténtalo de nuevo.");
     } finally {
       setIsSearching(false);
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsScanning(true);
+    setErrorMessage(null);
     try {
       const res = await scanLabel(file);
       setResult({ name: `Producto escaneado`, ...res });
-    } catch {
-      alert("Error al analizar la imagen.");
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Error al analizar la imagen. Inténtalo de nuevo.");
     } finally {
       setIsScanning(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -48,6 +52,12 @@ export function SearchScanner({ onAddEntry }: { onAddEntry: (e: Omit<FoodEntry, 
         <h1 className="text-4xl font-bold tracking-tight uppercase">BUSCAR</h1>
         <p className="text-xl font-bold">¿QUÉ ES ESTO?</p>
       </header>
+
+      {errorMessage && (
+        <div className="bg-[#0f380f] text-[#9bbc0f] p-3 text-center font-bold text-lg rounded-xl animate-pulse">
+          {errorMessage}
+        </div>
+      )}
 
       <form onSubmit={handleSearch} className="space-y-4">
         <div className="relative border-4 border-[#0f380f] bg-[#8bac0f] rounded-xl overflow-hidden">

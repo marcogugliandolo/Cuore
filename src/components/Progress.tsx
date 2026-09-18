@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
+import type { ChangeEvent } from "react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { AnalyticsEntry, WeightEntry } from "../types";
 import { scanAnalytics } from "../api";
@@ -11,16 +12,28 @@ interface ProgressProps {
   weightData: WeightEntry[];
   onAddAnalytics: (e: Omit<AnalyticsEntry, "id">) => void;
   onAddWeight: (e: Omit<WeightEntry, "id">) => void;
+  onDeleteAnalytics?: (id: string) => void;
+  onDeleteWeight?: (id: string) => void;
 }
 
-export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeight }: ProgressProps) {
+export function Progress({ 
+  analyticsData, 
+  weightData, 
+  onAddAnalytics, 
+  onAddWeight,
+  onDeleteAnalytics,
+  onDeleteWeight 
+}: ProgressProps) {
   const [isUploading, setIsUploading] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<{ text: string; isError: boolean } | null>(null);
+  const [showWeightHistory, setShowWeightHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
+    setStatusMessage(null);
     try {
       const res = await scanAnalytics(file);
       onAddAnalytics({
@@ -29,9 +42,9 @@ export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeigh
         cholesterol: res.cholesterol || 0,
         notes: res.notes || "Análisis completado",
       });
-      alert("Analítica analizada y guardada con éxito.");
-    } catch (error) {
-      alert("Error al analizar la imagen.");
+      setStatusMessage({ text: "¡Analítica guardada con éxito!", isError: false });
+    } catch (error: any) {
+      setStatusMessage({ text: error?.message || "Error al analizar la imagen.", isError: true });
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -57,7 +70,7 @@ export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeigh
     <div className="space-y-6">
       <header className="border-b-4 border-[#0f380f] pb-4 flex items-end justify-between">
         <div>
-          <h1 className="text-4xl font-bold tracking-tight uppercase">STATS</h1>
+          <h1 className="text-4xl font-bold tracking-tight uppercase">INFORMES</h1>
         </div>
         <div>
           <input type="file" accept="image/*,application/pdf" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
@@ -72,9 +85,33 @@ export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeigh
         </div>
       </header>
 
+      {statusMessage && (
+        <div
+          className={`p-3 text-center font-bold text-lg rounded-xl ${
+            statusMessage.isError
+              ? "bg-[#0f380f] text-[#9bbc0f] animate-pulse"
+              : "border-4 border-[#0f380f] bg-[#9bbc0f] text-[#0f380f]"
+          }`}
+        >
+          {statusMessage.text}
+        </div>
+      )}
+
       {/* Peso */}
       <section className="bg-[#8bac0f] p-4 rounded-xl border-4 border-[#0f380f]">
-        <h3 className="text-xl font-bold uppercase mb-4">PESO (kg)</h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold uppercase">PESO (kg)</h3>
+          {weightData.length > 0 && (
+            <button
+              onClick={() => setShowWeightHistory(!showWeightHistory)}
+              className="text-xs font-bold border-2 border-[#0f380f] px-2 py-1 rounded bg-[#9bbc0f] hover:bg-[#0f380f] hover:text-[#9bbc0f] transition-colors flex items-center gap-1"
+            >
+              <span>{showWeightHistory ? "Ocultar lista" : `Ver lista (${weightData.length})`}</span>
+              {showWeightHistory ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+        </div>
+
         {weightData.length === 0 ? (
           <p className="text-xl font-medium">SIN DATOS</p>
         ) : (
@@ -88,6 +125,22 @@ export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeigh
                 <Area type="step" dataKey="weight" stroke="#0f380f" strokeWidth={4} fillOpacity={0} />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        )}
+
+        {/* Historial de pesos con opción de eliminar */}
+        {showWeightHistory && weightData.length > 0 && (
+          <div className="mt-4 pt-4 border-t-2 border-[#0f380f] space-y-2">
+            <h4 className="font-bold text-lg uppercase mb-2">Registros de Peso</h4>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {weightData.slice().reverse().map(w => (
+                <WeightItem 
+                  key={w.id} 
+                  entry={w} 
+                  onDelete={() => onDeleteWeight?.(w.id)} 
+                />
+              ))}
+            </div>
           </div>
         )}
       </section>
@@ -113,23 +166,105 @@ export function Progress({ analyticsData, weightData, onAddAnalytics, onAddWeigh
             </div>
             
             <div className="space-y-4">
-              <h4 className="font-bold text-xl border-b-2 border-[#0f380f] pb-2">INFORMES</h4>
+              <div className="flex justify-between items-center border-b-2 border-[#0f380f] pb-2">
+                <h4 className="font-bold text-xl uppercase">INFORMES GUARDADOS</h4>
+                <span className="text-sm font-bold opacity-75">{analyticsData.length} informe{analyticsData.length === 1 ? "" : "s"}</span>
+              </div>
+
               {analyticsData.slice().reverse().map(a => (
-                <div key={a.id} className="p-3 border-4 border-[#0f380f] rounded-lg">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="font-bold text-lg">{format(parseISO(a.date), "dd/MM/yy")}</span>
-                    <div className="flex gap-4 text-sm font-bold">
-                      <span>TG: <strong className="text-xl">{a.triglycerides}</strong></span>
-                      <span>COL: <strong className="text-xl">{a.cholesterol}</strong></span>
-                    </div>
-                  </div>
-                  <p className="text-lg leading-tight">{a.notes}</p>
-                </div>
+                <AnalyticsItem 
+                  key={a.id} 
+                  entry={a} 
+                  onDelete={() => onDeleteAnalytics?.(a.id)} 
+                />
               ))}
             </div>
           </>
         )}
       </section>
+    </div>
+  );
+}
+
+function WeightItem({ entry, onDelete }: { entry: WeightEntry; onDelete: () => void; key?: string }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  return (
+    <div className="flex items-center justify-between p-2 bg-[#9bbc0f] border-2 border-[#0f380f] rounded-lg">
+      <span className="font-bold">{format(parseISO(entry.date), "dd/MM/yyyy")}</span>
+      <div className="flex items-center gap-3">
+        <span className="font-black text-xl">{entry.weight} kg</span>
+        {isConfirming ? (
+          <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-1.5 py-0.5 rounded text-xs">
+            <span>¿Borrar?</span>
+            <button 
+              onClick={onDelete} 
+              className="bg-[#9bbc0f] text-[#0f380f] px-1 py-0.2 rounded font-black hover:bg-white"
+            >
+              SÍ
+            </button>
+            <button 
+              onClick={() => setIsConfirming(false)} 
+              className="border border-[#9bbc0f] px-1 py-0.2 rounded font-bold"
+            >
+              NO
+            </button>
+          </div>
+        ) : (
+          <button 
+            onClick={() => setIsConfirming(true)}
+            className="p-1 border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] rounded transition-colors"
+            title="Eliminar este peso"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsItem({ entry, onDelete }: { entry: AnalyticsEntry; onDelete: () => void; key?: string }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+
+  return (
+    <div className="p-3 border-4 border-[#0f380f] rounded-lg bg-[#9bbc0f]/60 relative">
+      <div className="flex justify-between items-center mb-2">
+        <span className="font-bold text-lg">{format(parseISO(entry.date), "dd/MM/yyyy")}</span>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-3 text-sm font-bold">
+            <span>TG: <strong className="text-xl">{entry.triglycerides}</strong></span>
+            <span>COL: <strong className="text-xl">{entry.cholesterol}</strong></span>
+          </div>
+          {isConfirming ? (
+            <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-2 py-0.5 rounded text-xs font-bold">
+              <span>¿Borrar?</span>
+              <button 
+                onClick={onDelete} 
+                className="bg-[#9bbc0f] text-[#0f380f] px-1.5 py-0.2 rounded font-black hover:bg-white"
+              >
+                SÍ
+              </button>
+              <button 
+                onClick={() => setIsConfirming(false)} 
+                className="border border-[#9bbc0f] px-1.5 py-0.2 rounded font-bold"
+              >
+                NO
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsConfirming(true)}
+              className="border-2 border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] p-1.5 rounded transition-colors text-xs font-bold flex items-center gap-1"
+              title="Eliminar esta analítica"
+            >
+              <Trash2 size={13} />
+              <span className="hidden sm:inline">BORRAR</span>
+            </button>
+          )}
+        </div>
+      </div>
+      <p className="text-lg leading-tight">{entry.notes}</p>
     </div>
   );
 }

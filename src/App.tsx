@@ -62,6 +62,14 @@ export default function App() {
     setEntries((prev) => prev.filter((e) => e.id !== id));
   };
 
+  const deleteWeight = (id: string) => {
+    setWeightData((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const deleteAnalytics = (id: string) => {
+    setAnalyticsData((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const addAnalytics = (entry: Omit<AnalyticsEntry, "id">) => {
     const newEntry: AnalyticsEntry = { ...entry, id: crypto.randomUUID() };
     setAnalyticsData((prev) => [...prev, newEntry].sort((a, b) => a.date.localeCompare(b.date)));
@@ -89,7 +97,8 @@ export default function App() {
           onDeleteEntry={deleteEntry} 
           analyticsData={analyticsData} 
           weightData={weightData} 
-          onAddWeight={addWeight} 
+          onAddWeight={addWeight}
+          onDeleteWeight={deleteWeight}
         />
       )}
       {activeTab === "search" && <SearchScanner onAddEntry={addEntry} />}
@@ -98,7 +107,9 @@ export default function App() {
           analyticsData={analyticsData} 
           weightData={weightData} 
           onAddAnalytics={addAnalytics} 
-          onAddWeight={addWeight} 
+          onAddWeight={addWeight}
+          onDeleteAnalytics={deleteAnalytics}
+          onDeleteWeight={deleteWeight}
         />
       )}
     </Layout>

@@ -11,8 +11,12 @@ export const classifyFood = async (food: string): Promise<{ status: FoodStatus, 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ food })
   });
-  if (!res.ok) throw new Error("Error al analizar el alimento.");
-  return res.json();
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "No se pudo clasificar el alimento. Inténtalo de nuevo.");
+  }
+  return data;
 }
 
 export const scanLabel = async (file: File): Promise<{ status: FoodStatus, reason: string }> => {
@@ -22,8 +26,12 @@ export const scanLabel = async (file: File): Promise<{ status: FoodStatus, reaso
     method: "POST",
     body: formData
   });
-  if (!res.ok) throw new Error("Error al analizar la etiqueta.");
-  return res.json();
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "No se pudo analizar la etiqueta. Inténtalo de nuevo.");
+  }
+  return data;
 }
 
 export const scanAnalytics = async (file: File): Promise<{ triglycerides: number | null, cholesterol: number | null, notes: string }> => {
@@ -33,22 +41,26 @@ export const scanAnalytics = async (file: File): Promise<{ triglycerides: number
     method: "POST",
     body: formData
   });
-  if (!res.ok) throw new Error("Error al analizar la analítica médica.");
-  return res.json();
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.error || "No se pudo analizar la analítica médica. Inténtalo de nuevo.");
+  }
+  return data;
 }
 
 function getHardcodedClassification(food: string): { status: FoodStatus, reason: string } | null {
-  const buenos = ["nuez", "nueces", "pipas", "girasol", "aceitunas", "aguacate", "sardinas", "caballa", "huevo duro", "huevo", "yogur natural", "palomitas", "chocolate negro", "hummus", "crudites", "kale", "boniato"];
-  const evitar = ["fruta desecada", "zumo", "jugo", "fritos", "chocapic", "alcohol", "maíz frito", "corn flakes", "azucar", "azúcar"];
+  const buenos = ["nuez", "nueces", "pipas", "girasol", "aceitunas", "aguacate", "sardinas", "caballa", "huevo duro", "huevo", "yogur natural", "palomitas", "chocolate negro", "hummus", "crudites", "kale", "boniato", "avena", "salmon", "salmón", "aceite de oliva"];
+  const evitar = ["fruta desecada", "zumo", "jugo", "fritos", "chocapic", "alcohol", "maíz frito", "corn flakes", "azucar", "azúcar", "bollería", "galletas", "refresco"];
   
   for (const b of buenos) {
     if (food.includes(b)) {
-      return { status: "Bueno", reason: "Alimento identificado en la base de datos segura (grasas saludables/fibra)." };
+      return { status: "Bueno", reason: "Alimento cardiosaludable (grasas saludables/fibra para reducir triglicéridos)." };
     }
   }
   for (const e of evitar) {
     if (food.includes(e)) {
-      return { status: "Evitar", reason: "Contiene componentes desaconsejados para triglicéridos altos (azúcar/fritos/refinados)." };
+      return { status: "Evitar", reason: "Componentes desaconsejados para triglicéridos altos (azúcar/fritos/refinados)." };
     }
   }
   return null;

@@ -1,10 +1,11 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2 } from "lucide-react";
+import { Loader2, Trash2, ChevronDown, ChevronUp } from "lucide-react";
 import { FoodEntry, AnalyticsEntry, WeightEntry } from "../types";
 import { classifyFood } from "../api";
-import { cn } from "@/lib/utils";
+import { cn } from "../lib/utils";
 
 interface DashboardProps {
   entries: FoodEntry[];
@@ -13,17 +14,21 @@ interface DashboardProps {
   analyticsData: AnalyticsEntry[];
   weightData: WeightEntry[];
   onAddWeight: (entry: Omit<WeightEntry, "id">) => void;
+  onDeleteWeight?: (id: string) => void;
 }
 
-export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, weightData, onAddWeight }: DashboardProps) {
+export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, weightData, onAddWeight, onDeleteWeight }: DashboardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalTab, setModalTab] = useState<"comida" | "peso">("comida");
   
   const [newItem, setNewItem] = useState("");
   const [mealType, setMealType] = useState<"Desayuno" | "Comida" | "Cena" | "Otro">("Comida");
   const [isAdding, setIsAdding] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   
   const [todayWeight, setTodayWeight] = useState("");
+  const [confirmWeightDelete, setConfirmWeightDelete] = useState(false);
+  const [showPastEntries, setShowPastEntries] = useState(false);
 
   const todayEntries = entries.filter((e) => isToday(e.timestamp));
   const pastEntries = entries.filter((e) => !isToday(e.timestamp));
@@ -31,23 +36,24 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
   const latestAnalytics = analyticsData.length > 0 ? analyticsData[analyticsData.length - 1] : null;
   const todayWeightEntry = weightData.find(w => w.date === format(new Date(), "yyyy-MM-dd"));
 
-  const handleAddFood = async (e: React.FormEvent) => {
+  const handleAddFood = async (e: FormEvent) => {
     e.preventDefault();
     if (!newItem.trim()) return;
     setIsAdding(true);
+    setModalError(null);
     try {
       const { status, reason } = await classifyFood(newItem);
       onAddEntry({ name: newItem.trim(), status, reason, mealType });
       setNewItem("");
       setIsModalOpen(false);
-    } catch (error) {
-      alert("Error al analizar el alimento.");
+    } catch (error: any) {
+      setModalError(error?.message || "Error al analizar el alimento.");
     } finally {
       setIsAdding(false);
     }
   };
 
-  const handleSaveWeight = (e: React.FormEvent) => {
+  const handleSaveWeight = (e: FormEvent) => {
     e.preventDefault();
     if (!todayWeight) return;
     onAddWeight({ date: format(new Date(), "yyyy-MM-dd"), weight: Number(todayWeight) });
@@ -98,10 +104,43 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
             {latestAnalytics?.triglycerides || "---"}
           </p>
         </div>
-        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-center">
-          <p className="text-sm font-bold uppercase">Peso</p>
+        <div className="border-4 border-[#0f380f] p-4 rounded-xl flex flex-col justify-between relative">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold uppercase">Peso</p>
+            {todayWeightEntry && onDeleteWeight && (
+              confirmWeightDelete ? (
+                <div className="flex items-center gap-1 bg-[#0f380f] text-[#9bbc0f] px-1.5 py-0.5 rounded text-xs">
+                  <span>¿Borrar?</span>
+                  <button
+                    onClick={() => {
+                      onDeleteWeight(todayWeightEntry.id);
+                      setConfirmWeightDelete(false);
+                    }}
+                    className="font-black text-[#9bbc0f] hover:underline"
+                  >
+                    SÍ
+                  </button>
+                  <span>/</span>
+                  <button
+                    onClick={() => setConfirmWeightDelete(false)}
+                    className="font-bold text-[#9bbc0f] hover:underline"
+                  >
+                    NO
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmWeightDelete(true)}
+                  className="border border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] px-1.5 py-0.5 rounded text-xs font-bold flex items-center gap-1 transition-colors"
+                  title="Eliminar registro de peso de hoy"
+                >
+                  <Trash2 size={11} /> BORRAR
+                </button>
+              )
+            )}
+          </div>
           <p className="text-3xl font-black mt-2">
-            {todayWeightEntry?.weight || "---"} kg
+            {todayWeightEntry?.weight ? `${todayWeightEntry.weight} kg` : "--- kg"}
           </p>
         </div>
       </section>
@@ -116,7 +155,10 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
 
       {/* ENTRIES LIST */}
       <section className="space-y-4 pt-4 border-t-4 border-[#0f380f]">
-        <h2 className="text-2xl font-bold uppercase">Registro de Hoy</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold uppercase">Registro de Hoy</h2>
+          <span className="text-sm font-bold opacity-75">{todayEntries.length} comida{todayEntries.length === 1 ? "" : "s"}</span>
+        </div>
         
         {todayEntries.length === 0 ? (
           <p className="text-xl text-center py-4 border-2 border-dashed border-[#0f380f]">Vacio...</p>
@@ -125,6 +167,32 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
             {todayEntries.map(entry => (
               <EntryRow key={entry.id} entry={entry} onDelete={() => onDeleteEntry(entry.id)} />
             ))}
+          </div>
+        )}
+
+        {/* PAST ENTRIES TOGGLE */}
+        {pastEntries.length > 0 && (
+          <div className="pt-4 border-t-2 border-dashed border-[#0f380f]">
+            <button
+              onClick={() => setShowPastEntries(!showPastEntries)}
+              className="w-full flex items-center justify-between p-3 border-2 border-[#0f380f] rounded-lg font-bold text-lg hover:bg-[#8bac0f] transition-colors"
+            >
+              <span>DÍAS ANTERIORES ({pastEntries.length})</span>
+              {showPastEntries ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+            </button>
+
+            {showPastEntries && (
+              <div className="mt-3 space-y-3">
+                {pastEntries.map(entry => (
+                  <EntryRow 
+                    key={entry.id} 
+                    entry={entry} 
+                    onDelete={() => onDeleteEntry(entry.id)} 
+                    showDate={true} 
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -142,6 +210,12 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
             </button>
 
             <h2 className="text-3xl font-bold mb-6 text-center uppercase">Nuevo Registro</h2>
+
+            {modalError && (
+              <div className="bg-[#0f380f] text-[#9bbc0f] p-2 text-center font-bold text-lg rounded-lg mb-4 animate-pulse">
+                {modalError}
+              </div>
+            )}
 
             <div className="flex border-4 border-[#0f380f] rounded-lg mb-6 overflow-hidden font-bold">
               <button 
@@ -229,7 +303,8 @@ export function Dashboard({ entries, onAddEntry, onDeleteEntry, analyticsData, w
   );
 }
 
-function EntryRow({ entry, onDelete, showDate = false }: { entry: FoodEntry, onDelete: () => void, showDate?: boolean }) {
+function EntryRow({ entry, onDelete, showDate = false }: { entry: FoodEntry; onDelete: () => void; showDate?: boolean; key?: string }) {
+  const [isConfirming, setIsConfirming] = useState(false);
   const statusIcon = {
     Bueno: "(^)",
     Moderado: "(=)",
@@ -238,9 +313,46 @@ function EntryRow({ entry, onDelete, showDate = false }: { entry: FoodEntry, onD
 
   return (
     <div className="p-4 border-4 border-[#0f380f] flex flex-col gap-2 relative bg-[#8bac0f] rounded-lg">
-      <div className="flex items-start justify-between">
-        <h3 className="font-bold text-xl uppercase truncate pr-8">{entry.name}</h3>
-        <span className="font-black text-xl shrink-0">{statusIcon[entry.status]}</span>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1 pr-2">
+          <h3 className="font-bold text-xl uppercase truncate">{entry.name}</h3>
+          {showDate && (
+            <p className="text-sm font-bold opacity-75">
+              {format(entry.timestamp, "dd/MM/yyyy HH:mm")}
+            </p>
+          )}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-black text-xl">{statusIcon[entry.status]}</span>
+          {isConfirming ? (
+            <div className="flex items-center gap-1.5 bg-[#0f380f] text-[#9bbc0f] px-2 py-1 rounded text-xs">
+              <span className="font-bold">¿Borrar?</span>
+              <button 
+                onClick={onDelete}
+                className="bg-[#9bbc0f] text-[#0f380f] px-1.5 py-0.5 rounded font-black hover:bg-white"
+                title="Confirmar borrar"
+              >
+                SÍ
+              </button>
+              <button 
+                onClick={() => setIsConfirming(false)}
+                className="border border-[#9bbc0f] px-1.5 py-0.5 rounded font-bold hover:bg-[#8bac0f]"
+                title="Cancelar"
+              >
+                NO
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={() => setIsConfirming(true)} 
+              className="border-2 border-[#0f380f] hover:bg-[#0f380f] hover:text-[#9bbc0f] p-1.5 rounded transition-colors flex items-center gap-1 text-xs font-bold"
+              title="Eliminar este alimento"
+            >
+              <Trash2 size={14} />
+              <span className="hidden sm:inline">BORRAR</span>
+            </button>
+          )}
+        </div>
       </div>
       
       <div className="flex flex-wrap gap-2">
@@ -255,13 +367,6 @@ function EntryRow({ entry, onDelete, showDate = false }: { entry: FoodEntry, onD
       </div>
       
       <p className="text-lg leading-tight mt-1">{entry.reason}</p>
-      
-      <button 
-        onClick={onDelete} 
-        className="absolute top-2 right-2 font-black text-xl hover:text-red-600 px-2"
-      >
-        X
-      </button>
     </div>
   );
 }
